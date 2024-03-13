@@ -73,7 +73,7 @@ mlagents-learn --help
 
 ## 4. Installer Unity et les package Unity
 
-- Télécharger Unity Hub et Unity 2020.3.4f1 (LTS). C'est dans cette version que les exemples d'environnements ont été implémentés.
+- Télécharger Unity Hub et Unity 2022.3.4f1 (LTS). C'est dans cette version que les exemples d'environnements ont été implémentés.
 
 - Vous ensuite pouvez ouvrire le projet avec les exemples dans Unity Hub :
 

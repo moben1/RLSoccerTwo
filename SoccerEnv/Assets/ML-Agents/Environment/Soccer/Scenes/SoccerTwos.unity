@@ -263,6 +263,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114387866097048300, guid: 54f3340298537426e96a6cc530e2d5d8,
         type: 3}
+      propertyPath: m_BehaviorName
+      value: SoccerMaddpg
+      objectReference: {fileID: 0}
+    - target: {fileID: 114387866097048300, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
+      propertyPath: m_UseChildSensors
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114387866097048300, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
       propertyPath: m_BrainParameters.VectorObservationSize
       value: 18
       objectReference: {fileID: 0}
@@ -273,8 +283,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114734187185382186, guid: 54f3340298537426e96a6cc530e2d5d8,
         type: 3}
+      propertyPath: m_BehaviorName
+      value: SoccerMaddpg
+      objectReference: {fileID: 0}
+    - target: {fileID: 114734187185382186, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
+      propertyPath: m_UseChildSensors
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114734187185382186, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
       propertyPath: m_BrainParameters.VectorObservationSize
       value: 18
+      objectReference: {fileID: 0}
+    - target: {fileID: 404683423509059512, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
+      propertyPath: TakeActionsBetweenDecisions
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 559349321895083135, guid: 54f3340298537426e96a6cc530e2d5d8,
         type: 3}
@@ -285,6 +310,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Model
       value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 3316085536305919483, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
+      propertyPath: m_BehaviorName
+      value: SoccerMaddpg
       objectReference: {fileID: 0}
     - target: {fileID: 3316085536305919483, guid: 54f3340298537426e96a6cc530e2d5d8,
         type: 3}
@@ -343,11 +373,30 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8577361778124631730, guid: 54f3340298537426e96a6cc530e2d5d8,
         type: 3}
+      propertyPath: m_BehaviorName
+      value: SoccerMaddpg
+      objectReference: {fileID: 0}
+    - target: {fileID: 8577361778124631730, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
+      propertyPath: m_UseChildSensors
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8577361778124631730, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
+      propertyPath: m_ObservableAttributeHandling
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8577361778124631730, guid: 54f3340298537426e96a6cc530e2d5d8,
+        type: 3}
       propertyPath: m_BrainParameters.VectorObservationSize
       value: 18
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 9136065168043485173, guid: 54f3340298537426e96a6cc530e2d5d8, type: 3}
+    - {fileID: 1897170901855235213, guid: 54f3340298537426e96a6cc530e2d5d8, type: 3}
+    - {fileID: 4407673136905670519, guid: 54f3340298537426e96a6cc530e2d5d8, type: 3}
+    - {fileID: 736576636681813138, guid: 54f3340298537426e96a6cc530e2d5d8, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 54f3340298537426e96a6cc530e2d5d8, type: 3}

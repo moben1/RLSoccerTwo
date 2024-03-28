@@ -115,6 +115,7 @@ public class AgentSoccer : Agent
         sensor.AddObservation(mate.transform.localPosition.z);
         // * Opponents positions
         SimpleMultiAgentGroup opponents = envController.getOpponents(this.team);
+        Debug.Assert(opponents.GetRegisteredAgents().Count == 2);
         foreach (Agent opponent in opponents.GetRegisteredAgents())
         {
             sensor.AddObservation(opponent.transform.localPosition.x);
@@ -134,56 +135,13 @@ public class AgentSoccer : Agent
         sensor.AddObservation(opposingGoalPos.y);
     }
 
-    public void MoveAgent(ActionSegment<int> act)
-    {
-        var dirToGo = Vector3.zero;
-        var rotateDir = Vector3.zero;
-
-        m_KickPower = 0f;
-
-        var forwardAxis = act[0];
-        var rightAxis = act[1];
-        var rotateAxis = act[2];
-
-        switch (forwardAxis)
-        {
-            case 1:
-                dirToGo = transform.forward * m_ForwardSpeed;
-                m_KickPower = 1f;
-                break;
-            case 2:
-                dirToGo = transform.forward * -m_ForwardSpeed;
-                break;
-        }
-
-        switch (rightAxis)
-        {
-            case 1:
-                dirToGo = transform.right * m_LateralSpeed;
-                break;
-            case 2:
-                dirToGo = transform.right * -m_LateralSpeed;
-                break;
-        }
-
-        switch (rotateAxis)
-        {
-            case 1:
-                rotateDir = transform.up * -1f;
-                break;
-            case 2:
-                rotateDir = transform.up * 1f;
-                break;
-        }
-
-        transform.Rotate(rotateDir, Time.deltaTime * 100f);
-        agentRb.AddForce(dirToGo * m_SoccerSettings.agentRunSpeed,
-            ForceMode.VelocityChange);
-    }
-
     public override void OnActionReceived(ActionBuffers actionBuffers)
 
     {
+
+        var actionZ = 2f * Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
+        var actionX = 2f * Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
+        var actionRotate = 2f * Mathf.Clamp(actionBuffers.ContinuousActions[2], -1f, 1f);
 
         if (position == Position.Goalie)
         {
@@ -195,39 +153,28 @@ public class AgentSoccer : Agent
             // Existential penalty for Strikers
             AddReward(-m_Existential);
         }
-        MoveAgent(actionBuffers.DiscreteActions);
+
+        gameObject.transform.Rotate(0f, actionRotate, 0f, Space.Self);
+        agentRb.AddForce(transform.forward * m_ForwardSpeed * actionZ, ForceMode.VelocityChange);
+        agentRb.AddForce(transform.right * m_LateralSpeed * actionX, ForceMode.VelocityChange);
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        var discreteActionsOut = actionsOut.DiscreteActions;
-        //forward
-        if (Input.GetKey(KeyCode.W))
-        {
-            discreteActionsOut[0] = 1;
-        }
-        if (Input.GetKey(KeyCode.S))
-        {
-            discreteActionsOut[0] = 2;
-        }
-        //rotate
-        if (Input.GetKey(KeyCode.A))
-        {
-            discreteActionsOut[2] = 1;
-        }
-        if (Input.GetKey(KeyCode.D))
-        {
-            discreteActionsOut[2] = 2;
-        }
-        //right
-        if (Input.GetKey(KeyCode.E))
-        {
-            discreteActionsOut[1] = 1;
-        }
+        var contActionsOut = actionsOut.ContinuousActions;
+        contActionsOut[0] = Input.GetAxis("Vertical");
+        contActionsOut[1] = Input.GetAxis("Horizontal");
+        contActionsOut[2] = 0f;
         if (Input.GetKey(KeyCode.Q))
         {
-            discreteActionsOut[1] = 2;
+            contActionsOut[2] -= 1f;
         }
+        if (Input.GetKey(KeyCode.E))
+        {
+            contActionsOut[2] += 1f;
+        }
+        Debug.Log("Vertical: " + contActionsOut[0]);
+        Debug.Log("Horizontal: " + contActionsOut[1]);
     }
     /// <summary>
     /// Used to provide a "kick" to the ball.

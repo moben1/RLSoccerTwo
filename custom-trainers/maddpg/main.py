@@ -7,6 +7,8 @@ import argparse
 import os
 from trainer.MADDPG import MADDPG
 
+EXECUABLE_PATH = None  # "../CustomSoccer"
+
 EPISODE_NUM = 30000  # total episode num during training procedure
 EPISODE_LENGTH = 25  # steps per episode
 LEARN_INTERVAL = 100  # steps interval between learning time
@@ -72,7 +74,7 @@ if __name__ == '__main__':
     result_dir = os.path.join(env_dir, f'{total_files + 1}')
     os.makedirs(result_dir)
 
-    env, dim_info = get_env("../CustomSoccer")
+    env, dim_info = get_env(EXECUABLE_PATH)
     maddpg = MADDPG(dim_info,
                     args.buffer_capacity,
                     args.batch_size,

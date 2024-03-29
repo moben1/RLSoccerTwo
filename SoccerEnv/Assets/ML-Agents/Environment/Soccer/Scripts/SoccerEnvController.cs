@@ -42,8 +42,8 @@ public class SoccerEnvController : MonoBehaviour
     private SoccerSettings m_SoccerSettings;
 
 
-    private SimpleMultiAgentGroup m_BlueAgentGroup;
-    private SimpleMultiAgentGroup m_PurpleAgentGroup;
+    private List<AgentSoccer> m_BlueAgentGroup;
+    private List<AgentSoccer> m_PurpleAgentGroup;
 
     private int m_ResetTimer;
 
@@ -52,8 +52,8 @@ public class SoccerEnvController : MonoBehaviour
 
         m_SoccerSettings = FindObjectOfType<SoccerSettings>();
         // Initialize TeamManager
-        m_BlueAgentGroup = new SimpleMultiAgentGroup();
-        m_PurpleAgentGroup = new SimpleMultiAgentGroup();
+        m_BlueAgentGroup = new List<AgentSoccer>();
+        m_PurpleAgentGroup = new List<AgentSoccer>();
         ballRb = ball.GetComponent<Rigidbody>();
         m_BallStartingPos = new Vector3(ball.transform.position.x, ball.transform.position.y, ball.transform.position.z);
         foreach (var item in AgentsList)
@@ -65,23 +65,23 @@ public class SoccerEnvController : MonoBehaviour
             {
                 item.Agent.ownGoalPos = this.transform.Find("Field").Find("GoalBlue").transform.position;
                 item.Agent.opposingGoalPos = this.transform.Find("Field").Find("GoalPurple").transform.position;
-                m_BlueAgentGroup.RegisterAgent(item.Agent);
+                m_BlueAgentGroup.Add(item.Agent);
             }
             else
             {
                 item.Agent.ownGoalPos = this.transform.Find("Field").Find("GoalPurple").transform.position;
                 item.Agent.opposingGoalPos = this.transform.Find("Field").Find("GoalBlue").transform.position;
-                m_PurpleAgentGroup.RegisterAgent(item.Agent);
+                m_PurpleAgentGroup.Add(item.Agent);
             }
         }
         ResetScene();
     }
 
-    public Agent getMate(AgentSoccer agent)
+    public AgentSoccer getMate(AgentSoccer agent)
     {
         if (agent.team == Team.Blue)
         {
-            foreach (Agent a in m_BlueAgentGroup.GetRegisteredAgents())
+            foreach (AgentSoccer a in m_BlueAgentGroup)
             {
                 if (a != agent)
                 {
@@ -91,7 +91,7 @@ public class SoccerEnvController : MonoBehaviour
         }
         else
         {
-            foreach (Agent a in m_PurpleAgentGroup.GetRegisteredAgents())
+            foreach (AgentSoccer a in m_PurpleAgentGroup)
             {
                 if (a != agent)
                 {
@@ -102,7 +102,7 @@ public class SoccerEnvController : MonoBehaviour
         throw new System.Exception("No mate found");
     }
 
-    public SimpleMultiAgentGroup getOpponents(Team team)
+    public List<AgentSoccer> getOpponents(Team team)
     {
         if (team == Team.Blue)
         {
@@ -119,8 +119,14 @@ public class SoccerEnvController : MonoBehaviour
         m_ResetTimer += 1;
         if (m_ResetTimer >= MaxEnvironmentSteps && MaxEnvironmentSteps > 0)
         {
-            m_BlueAgentGroup.GroupEpisodeInterrupted();
-            m_PurpleAgentGroup.GroupEpisodeInterrupted();
+            foreach (AgentSoccer a in m_BlueAgentGroup)
+            {
+                a.EpisodeInterrupted();
+            }
+            foreach (AgentSoccer a in m_PurpleAgentGroup)
+            {
+                a.EpisodeInterrupted();
+            }
             ResetScene();
         }
     }
@@ -141,16 +147,30 @@ public class SoccerEnvController : MonoBehaviour
     {
         if (scoredTeam == Team.Blue)
         {
-            m_BlueAgentGroup.AddGroupReward(1 - (float)m_ResetTimer / MaxEnvironmentSteps);
-            m_PurpleAgentGroup.AddGroupReward(-1);
+            foreach (AgentSoccer a in m_BlueAgentGroup)
+            {
+                a.AddReward(1 - (float)m_ResetTimer / MaxEnvironmentSteps);
+                a.EndEpisode();
+            }
+            foreach (AgentSoccer a in m_PurpleAgentGroup)
+            {
+                a.AddReward(-1);
+                a.EndEpisode();
+            }
         }
         else
         {
-            m_PurpleAgentGroup.AddGroupReward(1 - (float)m_ResetTimer / MaxEnvironmentSteps);
-            m_BlueAgentGroup.AddGroupReward(-1);
+            foreach (AgentSoccer a in m_PurpleAgentGroup)
+            {
+                a.AddReward(1 - (float)m_ResetTimer / MaxEnvironmentSteps);
+                a.EndEpisode();
+            }
+            foreach (AgentSoccer a in m_BlueAgentGroup)
+            {
+                a.AddReward(-1);
+                a.EndEpisode();
+            }
         }
-        m_PurpleAgentGroup.EndGroupEpisode();
-        m_BlueAgentGroup.EndGroupEpisode();
         ResetScene();
 
     }

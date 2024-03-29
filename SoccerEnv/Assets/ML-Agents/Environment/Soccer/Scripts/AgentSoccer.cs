@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Policies;
@@ -110,13 +111,13 @@ public class AgentSoccer : Agent
         sensor.AddObservation(this.agentRb.velocity.x);
         sensor.AddObservation(this.agentRb.velocity.z);
         // * Mate position
-        Agent mate = envController.getMate(this);
+        AgentSoccer mate = envController.getMate(this);
         sensor.AddObservation(mate.transform.localPosition.x);
         sensor.AddObservation(mate.transform.localPosition.z);
         // * Opponents positions
-        SimpleMultiAgentGroup opponents = envController.getOpponents(this.team);
-        Debug.Assert(opponents.GetRegisteredAgents().Count == 2);
-        foreach (Agent opponent in opponents.GetRegisteredAgents())
+        List<AgentSoccer> opponents = envController.getOpponents(this.team);
+        Debug.Assert(opponents.Count == 2);
+        foreach (Agent opponent in opponents)
         {
             sensor.AddObservation(opponent.transform.localPosition.x);
             sensor.AddObservation(opponent.transform.localPosition.z);
@@ -139,9 +140,10 @@ public class AgentSoccer : Agent
 
     {
 
-        var actionZ = 2f * Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
-        var actionX = 2f * Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
-        var actionRotate = 2f * Mathf.Clamp(actionBuffers.ContinuousActions[2], -1f, 1f);
+        var actionZ = Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
+        var actionX = Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
+        var actionRotate = Mathf.Clamp(actionBuffers.ContinuousActions[2], -1f, 1f);
+        m_KickPower = 0f;
 
         if (position == Position.Goalie)
         {
@@ -154,7 +156,12 @@ public class AgentSoccer : Agent
             AddReward(-m_Existential);
         }
 
-        gameObject.transform.Rotate(0f, actionRotate, 0f, Space.Self);
+        if (actionZ > 0)
+        {
+            m_KickPower = actionZ;
+        }
+
+        transform.Rotate(new Vector3(0f, actionRotate, 0f), Time.deltaTime * 100f);
         agentRb.AddForce(transform.forward * m_ForwardSpeed * actionZ, ForceMode.VelocityChange);
         agentRb.AddForce(transform.right * m_LateralSpeed * actionX, ForceMode.VelocityChange);
     }

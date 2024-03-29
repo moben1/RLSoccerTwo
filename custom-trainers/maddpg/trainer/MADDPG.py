@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from trainer.Agent import Agent
 from trainer.Buffer import Buffer
 
+BUFFER_DEVICE = 'cpu'
+
 
 def setup_logger(filename):
     """ set up logger with filename. """
@@ -28,7 +30,7 @@ def setup_logger(filename):
 class MADDPG:
     """A MADDPG(Multi Agent Deep Deterministic Policy Gradient) agent"""
 
-    def __init__(self, dim_info, capacity, batch_size, actor_lr, critic_lr, res_dir):
+    def __init__(self, dim_info, capacity, batch_size, actor_lr, critic_lr, res_dir, buffer_device=BUFFER_DEVICE):
         # sum all the dims of each agent to get input dim for critic
         global_obs_act_dim = sum(sum(val) for val in dim_info.values())
         # create Agent(actor-critic) and replay buffer for each agent
@@ -36,8 +38,9 @@ class MADDPG:
         self.buffers = {}
         for agent_id, (obs_dim, act_dim) in dim_info.items():
             self.agents[agent_id] = Agent(obs_dim, act_dim, global_obs_act_dim, actor_lr, critic_lr)
-            self.buffers[agent_id] = Buffer(capacity, obs_dim, act_dim, 'cpu')
+            self.buffers[agent_id] = Buffer(capacity, obs_dim, act_dim, buffer_device)
         self.dim_info = dim_info
+        self.agent0 = list(dim_info.keys())[0]
 
         self.batch_size = batch_size
         self.res_dir = res_dir  # directory to save the training result
@@ -48,20 +51,22 @@ class MADDPG:
         for agent_id in obs.keys():
             o = obs[agent_id]
             a = action[agent_id]
-            if isinstance(a, int):
-                # the action from env.action_space.sample() is int, we have to convert it to onehot
-                # TODO : handle continuous action space here
-                a = np.eye(self.dim_info[agent_id][1])[a]
-
             r = reward[agent_id]
             next_o = next_obs[agent_id]
             d = done[agent_id]
+            # print("MADDPG : adding experience to buffer: \n")
+            # print("\t agent_id: ", agent_id, "\n")
+            # print("\t obs: ", o, "\n")
+            # print("\t action: ", a, "\n")
+            # print("\t reward: ", r, "\n")
+            # print("\t next_obs: ", next_o, "\n")
+            # print("\t done: ", d, "\n")
             self.buffers[agent_id].add(o, a, r, next_o, d)
 
     def sample(self, batch_size):
         """sample experience from all the agents' buffers, and collect data for network input"""
         # get the total num of transitions, these buffers should have same number of transitions
-        total_num = len(self.buffers['agent_0'])
+        total_num = len(self.buffers[self.agent0])
         indices = np.random.choice(total_num, size=batch_size, replace=False)
 
         # NOTE that in MADDPG, we need the obs and actions of all agents
@@ -79,14 +84,14 @@ class MADDPG:
 
         return obs, act, reward, next_obs, done, next_act
 
-    def select_action(self, obs):
+    def select_action(self, obs, explore=False):
         actions = {}
         for agent, o in obs.items():
             o = torch.from_numpy(o).unsqueeze(0).float()
-            a = self.agents[agent].action(o)  # torch.Size([1, action_size])
+            a = self.agents[agent].action(o, explore=explore)  # torch.Size([1, action_size])
             # NOTE that the output is a tensor, convert it to int before input to the environment
-            # actions[agent] = a.squeeze(0).argmax().item()
-            actions[agent] = a.squeeze(0).argmax().item()
+            actions[agent] = a.squeeze(0).detach()
+            # print("MADDPG : stepping agent with action: ", actions[agent], "\n")
             self.logger.info(f'{agent} action: {actions[agent]}')
         return actions
 
@@ -106,13 +111,15 @@ class MADDPG:
 
             # update actor
             # action of the current agent is calculated using its actor
-            # action, logits = agent.action(obs[agent_id], model_out=True)
-            action = agent.action(obs[agent_id], model_out=False)
+            action = agent.action(obs[agent_id], explore=False)
             act[agent_id] = action
             actor_loss = -agent.critic_value(list(obs.values()), list(act.values())).mean()
             actor_loss_pse = torch.pow(action, 2).mean()
             agent.update_actor(actor_loss + 1e-3 * actor_loss_pse)
-            # self.logger.info(f'agent{i}: critic loss: {critic_loss.item()}, actor loss: {actor_loss.item()}')
+            # print("MADDPG : updating agent : ", agent_id, "\n")
+            # print("\t critic loss: ", critic_loss.item(), "\n")
+            # print("\t actor loss: ", actor_loss.item(), "\n")
+            self.logger.info(f'Agent updating : critic loss: {critic_loss.item()}, actor loss: {actor_loss.item()}')
 
     def update_target(self, tau):
         def soft_update(from_network, to_network):
@@ -136,7 +143,7 @@ class MADDPG:
     @classmethod
     def load(cls, dim_info, file):
         """init maddpg using the model saved in `file`"""
-        instance = cls(dim_info, 0, 0, 0, 0, os.path.dirname(file))
+        instance = cls(dim_info, 0, 0, 0, 0, os.path.dirname(file), BUFFER_DEVICE)
         data = torch.load(file)
         for agent_id, agent in instance.agents.items():
             agent.actor.load_state_dict(data[agent_id])

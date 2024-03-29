@@ -7,18 +7,17 @@ import argparse
 import os
 from trainer.MADDPG import MADDPG
 
-EXECUABLE_PATH = None  # "../CustomSoccer"
+EXECUABLE_PATH = "../CustomSoccer"
 
 EPISODE_NUM = 30000  # total episode num during training procedure
-EPISODE_LENGTH = 25  # steps per episode
 LEARN_INTERVAL = 100  # steps interval between learning time
-RANDOM_STEPS = 5e4  # random steps before the agent start to learn
-TAU = 0.02  # soft update parameter
+RANDOM_STEPS = 5e3  # random steps before the agent start to learn
+TAU = 1e-3  # soft update parameter
 GAMMA = 0.95  # discount factor
 BUFFER_CAPACITY = int(1e6)  # capacity of replay buffer
-BATCH_SIZE = 1024  # batch-size of replay buffer
-ACTOR_LR = 0.01  # learning rate of actor
-CRITIC_LR = 0.01  # learning rate of critic
+BATCH_SIZE = 2048  # batch-size of replay buffer
+ACTOR_LR = 0.0003  # learning rate of actor
+CRITIC_LR = 0.0003  # learning rate of critic
 
 
 def get_env(executable: str, seed: Optional[int] = None):
@@ -50,10 +49,9 @@ def get_env(executable: str, seed: Optional[int] = None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run_id', type=str, help='id to save the run')
+    parser.add_argument('--run_id', type=str, help='id to save the run', default='unnamed_test_run')
     parser.add_argument('--episode_num', type=int, default=EPISODE_NUM,
                         help='total episode num during training procedure')
-    parser.add_argument('--episode_length', type=int, default=EPISODE_LENGTH, help='steps per episode')
     parser.add_argument('--learn_interval', type=int, default=LEARN_INTERVAL,
                         help='steps interval between learning time')
     parser.add_argument('--random_steps', type=int, default=RANDOM_STEPS,
@@ -80,7 +78,8 @@ if __name__ == '__main__':
                     args.batch_size,
                     args.actor_lr,
                     args.critic_lr,
-                    result_dir)
+                    result_dir
+                    )
 
     step = 0  # global step counter
     agent_num = env.num_agents
@@ -92,14 +91,12 @@ if __name__ == '__main__':
         while env.agents:  # interact with the env for an episode
             step += 1
             if step < args.random_steps:
-                action = {agent_id: env.action_space(agent_id).sample() for agent_id in env.agents}
+                action = {agent_id: np.clip(env.action_space(agent_id).sample(), -1.0, 1.0) for agent_id in env.agents}
             else:
-                action = maddpg.select_action(obs)
+                action = maddpg.select_action(obs, explore=True)
 
             next_obs, reward, done, info = env.step(action)
-            # env.render()
             maddpg.add(obs, action, reward, next_obs, done)
-
             for agent_id, r in reward.items():  # update reward
                 agent_reward[agent_id] += r
 
@@ -108,19 +105,22 @@ if __name__ == '__main__':
                 maddpg.update_target(args.tau)
 
             obs = next_obs
+            if all(done.values()):
+                print("FINISHING EPISONDE CAUSE IT4S DONE\n")
+                break
 
         # episode finishes
         for agent_id, r in agent_reward.items():  # record reward
             episode_rewards[agent_id][episode] = r
 
-        if (episode + 1) % 100 == 0:  # print info every 100 episodes
-            message = f'episode {episode + 1}, '
-            sum_reward = 0
-            for agent_id, r in agent_reward.items():  # record reward
-                message += f'{agent_id}: {r:>4f}; '
-                sum_reward += r
-            message += f'sum reward: {sum_reward}'
-            print(message)
+        # if (episode + 1) % 100 == 0:  # print info every 100 episodes
+        message = f'episode {episode + 1}, '
+        sum_reward = 0
+        for agent_id, r in agent_reward.items():  # record reward
+            message += f'{agent_id}: {r:>4f}; '
+            sum_reward += r
+        message += f'sum reward: {sum_reward}'
+        print(message)
 
     maddpg.save(episode_rewards)  # save model
 

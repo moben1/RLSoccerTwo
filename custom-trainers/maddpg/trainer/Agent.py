@@ -1,10 +1,13 @@
 from copy import deepcopy
 from typing import List
+from mlagents.torch_utils import default_device
 
 import torch
-import torch.nn.functional as F
+from torch.autograd import Variable
 from torch import nn, Tensor
 from torch.optim import Adam
+
+from trainer.OUNoise import OUNoise
 
 
 class Agent:
@@ -20,24 +23,32 @@ class Agent:
         self.critic_optimizer = Adam(self.critic.parameters(), lr=critic_lr)
         self.target_actor = deepcopy(self.actor)
         self.target_critic = deepcopy(self.critic)
+        self.exploration = OUNoise(act_dim)
+        self.move_to_device(default_device())
 
-    @staticmethod
-    def gumbel_softmax(logits, tau=1.0, eps=1e-20):
-        # NOTE that there is a function like this implemented in PyTorch(torch.nn.functional.gumbel_softmax),
-        # but as mention in the doc, it may be removed in the future, so i implement it myself
-        epsilon = torch.rand_like(logits)
-        logits += -torch.log(-torch.log(epsilon + eps) + eps)
-        return F.softmax(logits / tau, dim=-1)
+    def move_to_device(self, device):
+        self.actor.to(device)
+        self.critic.to(device)
+        self.target_actor.to(device)
+        self.target_critic.to(device)
 
-    def action(self, obs, model_out=False):
+    def reset_noise(self):
+        self.exploration.reset()
+
+    def scale_noise(self, scale):
+        self.exploration.scale = scale
+
+    def action(self, obs, explore=False):
         # this method is called in the following two cases:
         # a) interact with the environment
         # b) calculate action when update actor, where input(obs) is sampled from replay buffer with size:
         # torch.Size([batch_size, state_dim])
 
         action = self.actor(obs)  # torch.Size([batch_size, action_size])
-        # action = self.gumbel_softmax(logits)
-        # action = F.gumbel_softmax(logits, hard=True)
+        if explore:
+            action += Variable(Tensor(self.exploration.noise()), requires_grad=False)
+        action = action.clamp(-1.0, 1.0)
+        # print("AGENT : local action : ", action, "\n")
         return action
 
     def target_action(self, obs):
@@ -46,9 +57,9 @@ class Agent:
         # which is sampled from replay buffer with size torch.Size([batch_size, state_dim])
 
         action = self.target_actor(obs)  # torch.Size([batch_size, action_size])
-        # action = self.gumbel_softmax(logits)
-        # action = F.gumbel_softmax(logits, hard=True)
-        return action.squeeze(0).detach()
+        action = action.clamp(-1.0, 1.0)
+        action = action.squeeze(0).detach()
+        return action
 
     def critic_value(self, state_list: List[Tensor], act_list: List[Tensor]):
         x = torch.cat(state_list + act_list, 1)
@@ -72,7 +83,7 @@ class Agent:
 
 
 class MLPNetwork(nn.Module):
-    def __init__(self, in_dim, out_dim, hidden_dim=64, non_linear=nn.ReLU()):
+    def __init__(self, in_dim, out_dim, hidden_dim=128, non_linear=nn.ReLU()):
         super(MLPNetwork, self).__init__()
 
         self.net = nn.Sequential(

@@ -13,7 +13,7 @@
   7. Position du but de l'équipe (x, z)
   8. Position du but adverse (x, z)
 
-- **Action** : Discretes (3 actions), Déterministe
+- **Action** : Continue (3 dimensions), Déterministe, normalisés entre -1 et 1
   - Déplacement sur x
   - Déplacement sur z
   - Rotation sur y

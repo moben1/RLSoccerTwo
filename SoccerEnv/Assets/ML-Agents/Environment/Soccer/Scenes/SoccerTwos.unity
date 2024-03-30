@@ -200,6 +200,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3910372571798807768, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
+        type: 3}
+      propertyPath: m_BrainParameters.VectorObservationSize
+      value: 16
+      objectReference: {fileID: 0}
     - target: {fileID: 4059594382902941491, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
         type: 3}
       propertyPath: m_RootOrder
@@ -259,6 +264,21 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: CustomSoccerField (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6220284592176248375, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
+        type: 3}
+      propertyPath: m_BrainParameters.VectorObservationSize
+      value: 16
+      objectReference: {fileID: 0}
+    - target: {fileID: 7894004110507494290, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
+        type: 3}
+      propertyPath: m_BrainParameters.VectorObservationSize
+      value: 16
+      objectReference: {fileID: 0}
+    - target: {fileID: 9124942377003015224, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
+        type: 3}
+      propertyPath: m_BrainParameters.VectorObservationSize
+      value: 16
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

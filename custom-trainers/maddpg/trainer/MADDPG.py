@@ -10,6 +10,10 @@ from trainer.Agent import Agent
 from trainer.Buffer import Buffer
 
 BUFFER_DEVICE = 'cpu'
+POL_DEVICE = 'cpu'
+T_POL_DEVICE = 'cpu'
+CRIT_DEVICE = 'cpu'
+T_CRIT_DEVICE = 'cpu'
 
 
 def setup_logger(filename):
@@ -46,6 +50,19 @@ class MADDPG:
         self.res_dir = res_dir  # directory to save the training result
         self.logger = setup_logger(os.path.join(res_dir, 'maddpg.log'))
 
+    def scale_noise(self, scale):
+        """
+        Scale noise for each agent
+        Inputs:
+            scale (float): scale of noise
+        """
+        for a in self.agents.values():
+            a.scale_noise(scale)
+
+    def reset_noise(self):
+        for a in self.agents.values():
+            a.reset_noise()
+
     def add(self, obs, action, reward, next_obs, done):
         # NOTE that the experience is a dict with agent name as its key
         for agent_id in obs.keys():
@@ -54,13 +71,6 @@ class MADDPG:
             r = reward[agent_id]
             next_o = next_obs[agent_id]
             d = done[agent_id]
-            # print("MADDPG : adding experience to buffer: \n")
-            # print("\t agent_id: ", agent_id, "\n")
-            # print("\t obs: ", o, "\n")
-            # print("\t action: ", a, "\n")
-            # print("\t reward: ", r, "\n")
-            # print("\t next_obs: ", next_o, "\n")
-            # print("\t done: ", d, "\n")
             self.buffers[agent_id].add(o, a, r, next_o, d)
 
     def sample(self, batch_size):
@@ -89,7 +99,6 @@ class MADDPG:
         for agent, o in obs.items():
             o = torch.from_numpy(o).unsqueeze(0).float()
             a = self.agents[agent].action(o, explore=explore)  # torch.Size([1, action_size])
-            # NOTE that the output is a tensor, convert it to int before input to the environment
             actions[agent] = a.squeeze(0).detach()
             # print("MADDPG : stepping agent with action: ", actions[agent], "\n")
             self.logger.info(f'{agent} action: {actions[agent]}')
@@ -116,9 +125,6 @@ class MADDPG:
             actor_loss = -agent.critic_value(list(obs.values()), list(act.values())).mean()
             actor_loss_pse = torch.pow(action, 2).mean()
             agent.update_actor(actor_loss + 1e-3 * actor_loss_pse)
-            # print("MADDPG : updating agent : ", agent_id, "\n")
-            # print("\t critic loss: ", critic_loss.item(), "\n")
-            # print("\t actor loss: ", actor_loss.item(), "\n")
             self.logger.info(f'Agent updating : critic loss: {critic_loss.item()}, actor loss: {actor_loss.item()}')
 
     def update_target(self, tau):

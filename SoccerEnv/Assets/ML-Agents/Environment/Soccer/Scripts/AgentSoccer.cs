@@ -48,8 +48,8 @@ public class AgentSoccer : Agent
     public Vector3 initialPos;
     public float rotSign;
 
-    public Vector2 ownGoalPos;
-    public Vector2 opposingGoalPos;
+    public Vector3 ownGoalPos;
+    public Vector3 opposingGoalPos;
 
     EnvironmentParameters m_ResetParams;
 
@@ -102,48 +102,52 @@ public class AgentSoccer : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        // Add observations
         SoccerEnvController envController = GetComponentInParent<SoccerEnvController>();
-        // * Agent position
-        sensor.AddObservation(this.transform.localPosition.x);
-        sensor.AddObservation(this.transform.localPosition.z);
-        // * Agent velocity
-        sensor.AddObservation(this.agentRb.velocity.x);
-        sensor.AddObservation(this.agentRb.velocity.z);
-        // * Mate position
-        AgentSoccer mate = envController.getMate(this);
-        sensor.AddObservation(mate.transform.localPosition.x);
-        sensor.AddObservation(mate.transform.localPosition.z);
-        // * Opponents positions
-        List<AgentSoccer> opponents = envController.getOpponents(this.team);
-        Debug.Assert(opponents.Count == 2);
-        foreach (Agent opponent in opponents)
-        {
-            sensor.AddObservation(opponent.transform.localPosition.x);
-            sensor.AddObservation(opponent.transform.localPosition.z);
-        }
-        // * Ball position
-        sensor.AddObservation(envController.ball.transform.localPosition.x);
-        sensor.AddObservation(envController.ball.transform.localPosition.z);
-        // * Ball velocity
-        sensor.AddObservation(envController.ballRb.velocity.x);
-        sensor.AddObservation(envController.ballRb.velocity.z);
-        // * Own goal position
-        sensor.AddObservation(ownGoalPos.x);
-        sensor.AddObservation(ownGoalPos.y);
-        // * Opponent goal position
-        sensor.AddObservation(opposingGoalPos.x);
-        sensor.AddObservation(opposingGoalPos.y);
+
+        // Get Positions in World Space
+        var self_velocity = Vector3.Normalize(agentRb.velocity);
+        var mate_pos = envController.getMate(this).transform.localPosition;
+        var opponents = envController.getOpponents(this.team);
+        var opponent_1_pos = opponents[0].transform.localPosition;
+        var opponent_2_pos = opponents[1].transform.localPosition;
+        var ball_pos = envController.ball.transform.localPosition;
+        var ball_velocity = Vector3.Normalize(envController.ballRb.velocity);
+        var ownGoalLocal = ownGoalPos;
+        var opposingGoalLocal = opposingGoalPos;
+
+        // Transform to Local Space
+        Vector3[] transformedPos = new Vector3[] { mate_pos, opponent_1_pos, opponent_2_pos, ball_pos, ownGoalLocal, opposingGoalLocal };
+        Vector3[] transformedVel = new Vector3[] { self_velocity, ball_velocity };
+        transform.InverseTransformDirections(transformedVel);
+        transform.InverseTransformPoints(transformedPos);
+
+        // Register Observations
+        sensor.AddObservation(transformedVel[0].x);
+        sensor.AddObservation(transformedVel[0].z);
+        sensor.AddObservation(transformedPos[0].x);
+        sensor.AddObservation(transformedPos[0].z);
+        sensor.AddObservation(transformedPos[1].x);
+        sensor.AddObservation(transformedPos[1].z);
+        sensor.AddObservation(transformedPos[2].x);
+        sensor.AddObservation(transformedPos[2].z);
+        sensor.AddObservation(transformedPos[3].x);
+        sensor.AddObservation(transformedPos[3].z);
+        sensor.AddObservation(transformedVel[1].x);
+        sensor.AddObservation(transformedVel[1].z);
+        sensor.AddObservation(transformedPos[4].x);
+        sensor.AddObservation(transformedPos[4].z);
+        sensor.AddObservation(transformedPos[5].x);
+        sensor.AddObservation(transformedPos[5].z);
     }
 
     public override void OnActionReceived(ActionBuffers actionBuffers)
-
     {
-
-        var actionZ = Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
-        var actionX = Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
-        var actionRotate = Mathf.Clamp(actionBuffers.ContinuousActions[2], -1f, 1f);
+        float actionX = Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
+        float actionZ = Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
+        float actionRotate = Mathf.Clamp(actionBuffers.ContinuousActions[2], -1f, 1f);
         m_KickPower = 0f;
+
+        // Debug.Log("Action Received : [" + actionZ + ", " + actionX + ", " + actionRotate + "]");
 
         if (position == Position.Goalie)
         {
@@ -161,7 +165,7 @@ public class AgentSoccer : Agent
             m_KickPower = actionZ;
         }
 
-        transform.Rotate(new Vector3(0f, actionRotate, 0f), Time.deltaTime * 100f);
+        transform.Rotate(transform.up * actionRotate, Time.deltaTime * 100f);
         agentRb.AddForce(transform.forward * m_ForwardSpeed * actionZ, ForceMode.VelocityChange);
         agentRb.AddForce(transform.right * m_LateralSpeed * actionX, ForceMode.VelocityChange);
     }
@@ -180,8 +184,6 @@ public class AgentSoccer : Agent
         {
             contActionsOut[2] += 1f;
         }
-        Debug.Log("Vertical: " + contActionsOut[0]);
-        Debug.Log("Horizontal: " + contActionsOut[1]);
     }
     /// <summary>
     /// Used to provide a "kick" to the ball.
@@ -195,16 +197,27 @@ public class AgentSoccer : Agent
         }
         if (c.gameObject.CompareTag("ball"))
         {
-            AddReward(.2f * m_BallTouch);
-            var dir = c.contacts[0].point - transform.position;
-            dir = dir.normalized;
-            c.gameObject.GetComponent<Rigidbody>().AddForce(dir * force);
+            var agent_ball = c.contacts[0].point - transform.position;
+            agent_ball = agent_ball.normalized;
+            c.gameObject.GetComponent<Rigidbody>().AddForce(agent_ball * force);
+            // Reward if ball go to the goal
+            Vector2 agent_goal = new Vector2(opposingGoalPos.x - transform.position.x, opposingGoalPos.z - transform.position.z);
+            if (Vector2.Dot(agent_ball, agent_goal) >= 0)
+            {
+                //Debug.Log("Ball Touch Reward : " + .2f * m_BallTouch);
+                AddReward(.2f * m_BallTouch);
+            }
+            else
+            {
+                //Debug.Log("Ball Touch Reward : -" + 0.005f * m_BallTouch);
+                AddReward(-0.005f * m_BallTouch);
+            }
         }
     }
 
     public override void OnEpisodeBegin()
     {
-        m_BallTouch = m_ResetParams.GetWithDefault("ball_touch", 0);
+        m_BallTouch = m_ResetParams.GetWithDefault("ball_touch", 1f);
     }
 
 }

@@ -48,7 +48,6 @@ class Agent:
         if explore:
             action += Variable(Tensor(self.exploration.noise()), requires_grad=False)
         action = action.clamp(-1.0, 1.0)
-        # print("AGENT : local action : ", action, "\n")
         return action
 
     def target_action(self, obs):

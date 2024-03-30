@@ -9,7 +9,7 @@ from trainer.MADDPG import MADDPG
 
 EXECUABLE_PATH = "../CustomSoccer"
 
-EPISODE_NUM = 30000  # total episode num during training procedure
+EPISODE_NUM = 20  # total episode num during training procedure
 LEARN_INTERVAL = 100  # steps interval between learning time
 RANDOM_STEPS = 5e3  # random steps before the agent start to learn
 TAU = 1e-3  # soft update parameter
@@ -18,6 +18,8 @@ BUFFER_CAPACITY = int(1e6)  # capacity of replay buffer
 BATCH_SIZE = 2048  # batch-size of replay buffer
 ACTOR_LR = 0.0003  # learning rate of actor
 CRITIC_LR = 0.0003  # learning rate of critic
+FINAL_NOISE_SCALE = 0.0  # final noise scale
+INIT_NOISE_SCALE = 0.1  # initial noise scale
 
 
 def get_env(executable: str, seed: Optional[int] = None):
@@ -62,6 +64,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=BATCH_SIZE, help='batch-size of replay buffer')
     parser.add_argument('--actor_lr', type=float, default=ACTOR_LR, help='learning rate of actor')
     parser.add_argument('--critic_lr', type=float, default=CRITIC_LR, help='learning rate of critic')
+    parser.add_argument("--init_noise_scale", default=INIT_NOISE_SCALE, type=float)
+    parser.add_argument("--final_noise_scale", default=FINAL_NOISE_SCALE, type=float)
     args = parser.parse_args()
 
     # create folder to save result
@@ -88,6 +92,13 @@ if __name__ == '__main__':
     for episode in range(args.episode_num):
         obs = env.reset()
         agent_reward = {agent_id: 0 for agent_id in env.agents}  # agent reward of the current episode
+
+        # update noise scale
+        explr_pct_remaining = max(0, args.init_noise_scale - episode) / args.episode_num
+        maddpg.scale_noise(args.final_noise_scale + (args.init_noise_scale
+                           - args.final_noise_scale) * explr_pct_remaining)
+        maddpg.reset_noise()
+
         while env.agents:  # interact with the env for an episode
             step += 1
             if step < args.random_steps:

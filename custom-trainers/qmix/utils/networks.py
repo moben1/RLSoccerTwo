@@ -73,3 +73,14 @@ class QMixNet(nn.Module, ABC):
         q_total = torch.bmm(hidden, w2) + b2
         q_total = q_total.view(episode_num, -1, 1)
         return q_total
+
+
+def weight_init(m):
+    # weight_initialization
+    if isinstance(m, nn.Conv2d):
+        nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in', nonlinearity='relu')
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.normal_(m.weight, mean=0, std=0.02)
+    elif isinstance(m, nn.Linear):
+        nn.init.normal_(m.weight, mean=0, std=0.02)
+        nn.init.normal_(m.bias, mean=1, std=0.02)

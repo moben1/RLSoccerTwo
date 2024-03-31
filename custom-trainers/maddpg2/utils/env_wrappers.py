@@ -3,7 +3,7 @@ Modified from OpenAI Baselines code to work with multi-agent envs
 """
 import numpy as np
 from multiprocessing import Process, Pipe
-from baselines.common.vec_env import VecEnv, CloudpickleWrapper
+from external.vec_env import VecEnv, CloudpickleWrapper
 
 
 def worker(remote, parent_remote, env_fn_wrapper):
@@ -12,12 +12,12 @@ def worker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, done, info = env.step(data)
+            ob, reward, done, info = env.step_env(*data)
             if all(done):
-                ob = env.reset()
+                ob = env.reset_env(data[1])
             remote.send((ob, reward, done, info))
         elif cmd == 'reset':
-            ob = env.reset()
+            ob = env.reset_env(data)
             remote.send(ob)
         elif cmd == 'reset_task':
             ob = env.reset_task()
@@ -26,13 +26,9 @@ def worker(remote, parent_remote, env_fn_wrapper):
             remote.close()
             break
         elif cmd == 'get_spaces':
-            remote.send((env.observation_space, env.action_space))
-        elif cmd == 'get_agent_types':
-            if all([hasattr(a, 'adversary') for a in env.agents]):
-                remote.send(['adversary' if a.adversary else 'agent' for a in
-                             env.agents])
-            else:
-                remote.send(['agent' for _ in env.agents])
+            remote.send(([env.observation_space(a) for a in data], [env.action_space(a) for a in data]))
+        elif cmd == 'get_agent_ids':
+            remote.send(env.agents)
         else:
             raise NotImplementedError
 
@@ -47,22 +43,23 @@ class SubprocVecEnv(VecEnv):
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
         self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-            for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
+                   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
         for p in self.ps:
-            p.daemon = True # if the main process crashes, we should not cause things to hang
+            p.daemon = True  # if the main process crashes, we should not cause things to hang
             p.start()
         for remote in self.work_remotes:
             remote.close()
 
-        self.remotes[0].send(('get_spaces', None))
+        self.remotes[0].send(('get_agent_ids', None))
+        agent_ids = self.remotes[0].recv()
+        self.remotes[0].send(('get_spaces', agent_ids))
         observation_space, action_space = self.remotes[0].recv()
-        self.remotes[0].send(('get_agent_types', None))
-        self.agent_types = self.remotes[0].recv()
-        VecEnv.__init__(self, len(env_fns), observation_space, action_space)
+
+        VecEnv.__init__(self, len(env_fns), observation_space, action_space, agent_ids)
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(('step', (action, self.agent_ids)))
         self.waiting = True
 
     def step_wait(self):
@@ -73,7 +70,7 @@ class SubprocVecEnv(VecEnv):
 
     def reset(self):
         for remote in self.remotes:
-            remote.send(('reset', None))
+            remote.send(('reset', self.agent_ids))
         return np.stack([remote.recv() for remote in self.remotes])
 
     def reset_task(self):
@@ -85,7 +82,7 @@ class SubprocVecEnv(VecEnv):
         if self.closed:
             return
         if self.waiting:
-            for remote in self.remotes:            
+            for remote in self.remotes:
                 remote.recv()
         for remote in self.remotes:
             remote.send(('close', None))
@@ -97,32 +94,39 @@ class SubprocVecEnv(VecEnv):
 class DummyVecEnv(VecEnv):
     def __init__(self, env_fns):
         self.envs = [fn() for fn in env_fns]
-        env = self.envs[0]        
-        VecEnv.__init__(self, len(env_fns), env.observation_space, env.action_space)
-        if all([hasattr(a, 'adversary') for a in env.agents]):
-            self.agent_types = ['adversary' if a.adversary else 'agent' for a in
-                                env.agents]
-        else:
-            self.agent_types = ['agent' for _ in env.agents]
-        self.ts = np.zeros(len(self.envs), dtype='int')        
+        env = self.envs[0]
+        # Save only the first agent's observation and action space since it
+        # is the same for all agents
+        agent_ids = env.agents
+        VecEnv.__init__(self, len(env_fns),
+                        [env.observation_space(a) for a in agent_ids],
+                        [env.action_space(a) for a in agent_ids],
+                        agent_ids)
+        # if all([hasattr(a, 'adversary') for a in env.agents]):
+        #    self.agent_types = ['adversary' if a.adversary else 'agent' for a in
+        #                        env.agents]
+        # else:
+        #    self.agent_types = ['agent' for _ in env.agents]
+        self.ts = np.zeros(len(self.envs), dtype='int')
         self.actions = None
 
     def step_async(self, actions):
         self.actions = actions
 
     def step_wait(self):
-        results = [env.step(a) for (a,env) in zip(self.actions, self.envs)]
+        results = [env.step_env(a, self.agent_ids) for (a, env) in zip(self.actions, self.envs)]
         obs, rews, dones, infos = map(np.array, zip(*results))
         self.ts += 1
         for (i, done) in enumerate(dones):
-            if all(done): 
-                obs[i] = self.envs[i].reset()
+            if all(done):
+                obs[i] = self.envs[i].reset_env(self.agent_ids)
                 self.ts[i] = 0
+                print(f"Episode of env {i} done")
         self.actions = None
         return np.array(obs), np.array(rews), np.array(dones), infos
 
-    def reset(self):        
-        results = [env.reset() for env in self.envs]
+    def reset(self):
+        results = [env.reset_env(self.agent_ids) for env in self.envs]
         return np.array(results)
 
     def close(self):

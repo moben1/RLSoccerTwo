@@ -15,14 +15,15 @@ class DDPGAgent(object):
     """
 
     def __init__(self, num_in_pol, num_out_pol, num_in_critic, hidden_dim=64,
-                 lr=0.01, discrete_action=False, id=None):
+                 actor_lr=5e-4, critic_lr=1e-3, discrete_action=False,
+                 agent_id=None):
         """
         Inputs:
             num_in_pol (int): number of dimensions for policy input
             num_out_pol (int): number of dimensions for policy output
             num_in_critic (int): number of dimensions for critic input
         """
-        self.id = id
+        self.agent_id = agent_id
         self.policy = MLPNetwork(num_in_pol, num_out_pol,
                                  hidden_dim=hidden_dim,
                                  constrain_out=True,
@@ -39,8 +40,8 @@ class DDPGAgent(object):
                                         constrain_out=False)
         hard_update(self.target_policy, self.policy)
         hard_update(self.target_critic, self.critic)
-        self.policy_optimizer = Adam(self.policy.parameters(), lr=lr)
-        self.critic_optimizer = Adam(self.critic.parameters(), lr=lr)
+        self.policy_optimizer = Adam(self.policy.parameters(), lr=actor_lr)
+        self.critic_optimizer = Adam(self.critic.parameters(), lr=critic_lr)
         if not discrete_action:
             self.exploration = OUNoise(num_out_pol)
         else:

@@ -133,10 +133,10 @@ class PZWrapper(UnityParallelEnv):
     def convert_obs(obs, agent_ids):
         """ Convert the env observations to a format compatible with MADDPG.
         """
-        return np.array([[obs[agent_id] for agent_id in agent_ids]])
+        return np.array([obs[agent_id] for agent_id in agent_ids])
 
 
-def make_env(executable=None, seed=None, benchmark=False, discrete_action=False):
+def make_env(executable=None, seed=None, worker=0, benchmark=False, no_graphics=False):
     '''
     Creates a Wrapped Unity Parallel environment for PettingZoo.
 
@@ -150,9 +150,9 @@ def make_env(executable=None, seed=None, benchmark=False, discrete_action=False)
     Output:
         pz_env          :  a Unity Wrapped PettingZoo Parallel environment
     '''
-    u_env = UnityEnvironment(file_name=executable, seed=seed)
+    u_env = UnityEnvironment(file_name=executable, seed=seed, worker_id=worker, no_graphics=no_graphics)
     pz_env = PZWrapper(u_env)
-    print("Environnment loaded : \n")
+    print("Environnment loaded :")
     print("\tAgent names:", pz_env.agents)
     print("\tFirst agent:", pz_env.agents[0])
     print("\tObservation space of first agent:", pz_env.observation_spaces[pz_env.agents[0]].shape)

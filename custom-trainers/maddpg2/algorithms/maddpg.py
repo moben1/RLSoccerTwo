@@ -18,9 +18,9 @@ class MADDPG(object):
     Wrapper class for DDPG-esque (i.e. also MADDPG) agents in multi-agent task
     """
 
-    def __init__(self, agent_init_params, num_in_critic,
-                 gamma=0.95, tau=0.01, lr=0.01, hidden_dim=64,
-                 discrete_action=False):
+    def __init__(self, agent_init_params, gamma=0.95, tau=0.01,
+                 actor_lr=5e-4, critic_lr=1e-3,
+                 hidden_dim=64, discrete_action=False):
         """
         Inputs:
             agent_init_params (list of dict): List of dicts with parameters to
@@ -37,16 +37,17 @@ class MADDPG(object):
             discrete_action (bool): Whether or not to use discrete action space
         """
         self.nagents = len(agent_init_params)
-        self.agents_id = [param['id'] for param in agent_init_params]
-        self.agents = [DDPGAgent(lr=lr, discrete_action=discrete_action,
-                                 hidden_dim=hidden_dim, num_in_critic=num_in_critic,
-                                 **params)
+        self.agents_id = [param['agent_id'] for param in agent_init_params]
+        self.agents = [DDPGAgent(actor_lr=actor_lr, critic_lr=critic_lr,
+                                 discrete_action=discrete_action,
+                                 hidden_dim=hidden_dim, **params)
                        for params in agent_init_params]
 
         self.agent_init_params = agent_init_params
         self.gamma = gamma
         self.tau = tau
-        self.lr = lr
+        self.actor_lr = actor_lr
+        self.critic_lr = critic_lr
         self.discrete_action = discrete_action
         self.pol_dev = POL_DEV  # device for policies
         self.critic_dev = CRITIC_DEV  # device for critics
@@ -221,13 +222,12 @@ class MADDPG(object):
         torch.save(save_dict, filename)
 
     @classmethod
-    def init_from_env(cls, env, gamma=0.95, tau=0.01, lr=0.01, hidden_dim=64):
+    def init_from_env(cls, env, gamma=0.95, tau=0.01, actor_lr=5e-4, critic_lr=1e-3, hidden_dim=128):
         """
         Instantiate instance of this class from multi-agent environment
         """
         agent_init_params = []
-        for agent_id in env.agents:
-            acsp, obsp = env.action_spaces[agent_id], env.observation_spaces[agent_id]
+        for a_id, acsp, obsp in zip(env.agent_ids, env.action_space, env.observation_space):
             num_in_pol = obsp.shape[0]
             if isinstance(acsp, Box):
                 discrete_action = False
@@ -236,16 +236,20 @@ class MADDPG(object):
                 discrete_action = True
                 def get_shape(x): return x.n
             num_out_pol = get_shape(acsp)
-            agent_init_params.append({'id': agent_id,
+            num_in_critic = 0
+            for oobsp in env.observation_space:
+                num_in_critic += oobsp.shape[0]
+            for oacsp in env.action_space:
+                num_in_critic += get_shape(oacsp)
+            agent_init_params.append({'agent_id': a_id,
                                       'num_in_pol': num_in_pol,
-                                      'num_out_pol': num_out_pol})
+                                      'num_out_pol': num_out_pol,
+                                      'num_in_critic': num_in_critic})
 
-        # in critic = all agents obs + all agents actions
-        num_in_critic = sum(param["num_in_pol"] + param["num_out_pol"] for param in agent_init_params)
-        init_dict = {'gamma': gamma, 'tau': tau, 'lr': lr,
+        init_dict = {'gamma': gamma, 'tau': tau,
+                     'actor_lr': actor_lr, 'critic_lr': critic_lr,
                      'hidden_dim': hidden_dim,
                      'agent_init_params': agent_init_params,
-                     'num_in_critic': num_in_critic,
                      'discrete_action': discrete_action}
         instance = cls(**init_dict)
         instance.init_dict = init_dict

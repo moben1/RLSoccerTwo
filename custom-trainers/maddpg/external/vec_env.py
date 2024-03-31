@@ -3,6 +3,7 @@
 import contextlib
 import os
 from abc import ABC, abstractmethod
+import logging
 
 
 class AlreadySteppingError(Exception):
@@ -46,6 +47,10 @@ class VecEnv(ABC):
         self.observation_space = observation_space
         self.action_space = action_space
         self.agent_ids = agent_ids
+        logging.info(f"Initialized VecEnv with {num_envs} environments")
+        logging.debug(f"Agent IDs: {agent_ids}")
+        logging.debug(f"Observation space: {observation_space}")
+        logging.debug(f"Action space: {action_space}")
 
     @abstractmethod
     def reset(self):

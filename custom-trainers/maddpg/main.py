@@ -6,12 +6,12 @@ import os
 from pathlib import Path
 import yaml
 import torch
+import logging
 import numpy as np
 
 from gym.spaces import Box
 
 from torch.autograd import Variable
-# from tensorboardX import SummaryWriter
 from utils.make_env import make_parallel_env
 from utils.buffer import ReplayBuffer
 from algorithms.maddpg import MADDPG
@@ -28,43 +28,56 @@ def load_config(config_file):
     return config_yml
 
 
-def run(config):
-    model_dir = Path('./models/maddpg') / config['Model']['model_name']
-
-    # If continue training, model_name is the path to the model.pt file
-    if config['Model']['continue_training']:
-        print(f'Continuing training from existing model at "{model_dir}"')
-        if not model_dir.exists():
-            raise FileNotFoundError('Could not find model directory')
-    # Else build new model directory path
-    elif not model_dir.exists():
-        curr_run = 'run1'
+def get_curr_run(model_dir):
+    if not model_dir.exists():
+        return 'run1'
     else:
         exst_run_nums = [int(str(folder.name).split('run')[1]) for folder in
                          model_dir.iterdir() if
                          str(folder.name).startswith('run')]
         if len(exst_run_nums) == 0:
-            curr_run = 'run1'
+            return 'run1'
         else:
-            curr_run = f'run{max(exst_run_nums) + 1}'
+            return f'run{max(exst_run_nums) + 1}'
 
-    # Create new run directory
+
+def run(config):
+    model_dir = Path('./models/maddpg') / config['Model']['model_name']
+
     if not config['Model']['continue_training']:
+        curr_run = get_curr_run(model_dir)
         run_dir = model_dir / curr_run
         log_dir = run_dir / 'logs'
         os.makedirs(log_dir)
+    elif not model_dir.exists():
+        raise FileNotFoundError('Could not find model directory')
 
-    logger = None  # SummaryWriter(str(log_dir))
+    logging.basicConfig(filename=log_dir / "main.log",
+                        format='%(asctime)s - %(levelname)s - %(message)s',
+                        datefmt='%Y/%m/%d %H:%M:%S',
+                        level=logging.INFO)
+
+    if not config['Model']['continue_training']:
+        logging.info(f"Starting new training run : {model_dir / curr_run}")
+    else:
+        logging.info(f"Continuing training run : {model_dir}")
+        logging.warning("Model parameters could be different from the current configuration as it is loaded")
+
+    logging.info(f"Environment Configuration : {config['Environment']}")
+    logging.info(f"Model Configuration : {config['Model']}")
+    logging.info(f"Torch Configuration : {config['Torch']}")
 
     # Set random seeds
     torch.manual_seed(config['Environment']['seed'])
     np.random.seed(config['Environment']['seed'])
 
     if not USE_CUDA:
+        logging.warning("CUDA not available.")
         torch.set_num_threads(config['Torch']['n_training_threads'])
 
     # Loading Unity environment
     env = make_parallel_env(**config['Environment'])
+    logging.info(f"Environment loaded")
 
     # Load or create model
     if config['Model']['continue_training']:
@@ -79,6 +92,8 @@ def run(config):
                                  [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                   for acsp in env.action_space])
 
+    logging.info("MADDPG and Replay Buffer initialized")
+
     # Load config parameters
     n_episodes = config['Model']['n_episodes']
     n_rollout_threads = config['Environment']['n_rollout_threads']
@@ -92,16 +107,18 @@ def run(config):
     # Start training
     t = 0
     for ep_i in range(0, n_episodes, n_rollout_threads):
-        print(f"New Episode : {ep_i + 1}-{ep_i + 1 + n_rollout_threads} of {n_episodes}")
+        logging.debug(f"Starting episode {ep_i + 1} to {ep_i + n_rollout_threads} of {n_episodes} episodes")
         obs = env.reset()
 
         maddpg.prep_rollouts(device='cpu')
 
         # Decay exploration noise
         explr_pct_remaining = max(0, explore['n_exploration_eps'] - ep_i) / explore['n_exploration_eps']
-        maddpg.scale_noise(explore['final_noise_scale'] + (explore['init_noise_scale']
-                           - explore['final_noise_scale']) * explr_pct_remaining)
+        scale = explore['final_noise_scale'] + (explore['init_noise_scale']
+                                                - explore['final_noise_scale']) * explr_pct_remaining
+        maddpg.scale_noise(scale)
         maddpg.reset_noise()
+        logging.debug(f"Decaying noise scale : {scale}")
 
         ep_len = 0
         envs_dones = [False for _ in range(n_rollout_threads)]
@@ -135,29 +152,34 @@ def run(config):
                 for u_i in range(n_rollout_threads):
                     for a_i in range(maddpg.nagents):
                         sample = replay_buffer.sample(batch_size, to_gpu=USE_CUDA)
-                        maddpg.update(sample, a_i, logger=logger)
+                        maddpg.update(sample, a_i)
                     maddpg.update_all_targets()
                 maddpg.prep_rollouts(device=rollout_dev)
 
             for i, done in enumerate(dones):
                 if all(done) :
-                    print(f"Episode {ep_i} of environment {i} over in {ep_len} steps")
+                    logging.debug(f"Episode {ep_i + i} finished after {ep_len} steps")
                     envs_dones[i] = True
 
         # Compute mean episode rewards per agent
         ep_rews = replay_buffer.get_average_rewards(ep_len * n_rollout_threads)
-        print("Episode mean rewards: ")
-        for a_i, a_ep_rew in enumerate(ep_rews):
-            print(f"\t{maddpg.agents_id[a_i]} : {a_ep_rew}")
-            # logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
+        ep_stats = {'n_episodes': ep_i,
+                    'n_rollout_threads': n_rollout_threads,
+                    'ep_len': ep_len,
+                    'mean_rews': {maddpg.agent_ids[i]: ep_rews[i] for i in range(maddpg.nagents)},
+                    'noise_scale': scale}
+        logging.info(f"EP stats :{ep_stats}")
 
         # Save model after every save_interval episodes
         if ep_i % save_interval < n_rollout_threads:
+            logging.info(f"Saving model at {run_dir / 'incremental' / f'model_ep{ep_i + 1}.pt'}")
             os.makedirs(run_dir / 'incremental', exist_ok=True)
             maddpg.save(run_dir / 'incremental' / f'model_ep{ep_i + 1}.pt')
             maddpg.save(run_dir / 'model.pt')
 
     # Final save
+    logging.info(f"Training complete. Saving final model.")
+    logging.info(f"Saving model {run_dir / 'model.pt'}")
     maddpg.save(run_dir / 'model.pt')
     env.close()
     # logger.export_scalars_to_json(str(log_dir / 'summary.json'))

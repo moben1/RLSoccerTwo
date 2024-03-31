@@ -200,6 +200,16 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1235297842282374929, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1235297842282374929, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3910372571798807768, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
         type: 3}
       propertyPath: m_BrainParameters.VectorObservationSize
@@ -213,17 +223,17 @@ PrefabInstance:
     - target: {fileID: 4059594382902941491, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.09
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4059594382902941491, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.12
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4059594382902941491, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.37
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4059594382902941491, guid: 41f6e3506d5a3fa45abe31a0a30b9f00,
         type: 3}

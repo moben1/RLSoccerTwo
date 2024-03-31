@@ -2,7 +2,7 @@ Environment:
   executable: "..\\CustomSoccer"
   no_graphics: False
   n_rollout_threads: 2
-  use_subprocess: True
+  use_subprocess: False
   seed: 1
 
 Torch:

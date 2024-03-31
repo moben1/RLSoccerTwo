@@ -2,6 +2,7 @@ import torch
 from gym.spaces import Box
 from utils.misc import soft_update, average_gradients, onehot_from_logits, gumbel_softmax
 from utils.agents import DDPGAgent
+import logging
 
 MSELoss = torch.nn.MSELoss()
 
@@ -30,7 +31,7 @@ class MADDPG(object):
             discrete_action (bool): Whether or not to use discrete action space
         """
         self.nagents = len(agent_init_params)
-        self.agents_id = [param['agent_id'] for param in agent_init_params]
+        self.agent_ids = [param['agent_id'] for param in agent_init_params]
         self.agents = [DDPGAgent(actor_lr=actor_lr, critic_lr=critic_lr,
                                  discrete_action=discrete_action,
                                  hidden_units=hidden_units, **params)
@@ -152,11 +153,10 @@ class MADDPG(object):
             average_gradients(curr_agent.policy)
         torch.nn.utils.clip_grad_norm_(curr_agent.policy.parameters(), 0.5)
         curr_agent.policy_optimizer.step()
-        if logger is not None:
-            logger.add_scalars('agent%i/losses' % agent_i,
-                               {'vf_loss': vf_loss,
-                                'pol_loss': pol_loss},
-                               self.niter)
+        stats = {'vf_loss': vf_loss,
+                 'pol_loss': pol_loss,
+                 'it': self.niter}
+        logging.debug("Updating {stats}")
 
     def update_all_targets(self):
         """

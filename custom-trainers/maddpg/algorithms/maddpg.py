@@ -1,16 +1,9 @@
-import numpy as np
 import torch
-import torch.nn.functional as F
 from gym.spaces import Box
 from utils.misc import soft_update, average_gradients, onehot_from_logits, gumbel_softmax
 from utils.agents import DDPGAgent
 
 MSELoss = torch.nn.MSELoss()
-
-POL_DEV = 'cpu'
-CRITIC_DEV = 'cpu'
-TRGT_POL_DEV = 'cpu'
-TRGT_CRITIC_DEV = 'cpu'
 
 
 class MADDPG(object):
@@ -20,7 +13,7 @@ class MADDPG(object):
 
     def __init__(self, agent_init_params, gamma=0.95, tau=0.01,
                  actor_lr=5e-4, critic_lr=1e-3,
-                 hidden_dim=64, discrete_action=False):
+                 hidden_units=64, discrete_action=False):
         """
         Inputs:
             agent_init_params (list of dict): List of dicts with parameters to
@@ -40,7 +33,7 @@ class MADDPG(object):
         self.agents_id = [param['agent_id'] for param in agent_init_params]
         self.agents = [DDPGAgent(actor_lr=actor_lr, critic_lr=critic_lr,
                                  discrete_action=discrete_action,
-                                 hidden_dim=hidden_dim, **params)
+                                 hidden_units=hidden_units, **params)
                        for params in agent_init_params]
 
         self.agent_init_params = agent_init_params
@@ -49,10 +42,13 @@ class MADDPG(object):
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
         self.discrete_action = discrete_action
-        self.pol_dev = POL_DEV  # device for policies
-        self.critic_dev = CRITIC_DEV  # device for critics
-        self.trgt_pol_dev = TRGT_POL_DEV  # device for target policies
-        self.trgt_critic_dev = TRGT_CRITIC_DEV  # device for target critics
+
+        # default devices are not important since it is modified
+        # at each prep_training() and prep_rollouts() call
+        self.pol_dev = 'cpu'  # device for policies
+        self.critic_dev = 'cpu'  # device for critics
+        self.trgt_pol_dev = 'cpu'  # device for target policies
+        self.trgt_critic_dev = 'cpu'  # device for target critics
         self.niter = 0
 
     @property
@@ -222,7 +218,7 @@ class MADDPG(object):
         torch.save(save_dict, filename)
 
     @classmethod
-    def init_from_env(cls, env, gamma=0.95, tau=0.01, actor_lr=5e-4, critic_lr=1e-3, hidden_dim=128):
+    def init_from_env(cls, env, gamma=0.95, tau=0.01, actor_lr=5e-4, critic_lr=1e-3, hidden_units=128):
         """
         Instantiate instance of this class from multi-agent environment
         """
@@ -248,7 +244,7 @@ class MADDPG(object):
 
         init_dict = {'gamma': gamma, 'tau': tau,
                      'actor_lr': actor_lr, 'critic_lr': critic_lr,
-                     'hidden_dim': hidden_dim,
+                     'hidden_units': hidden_units,
                      'agent_init_params': agent_init_params,
                      'discrete_action': discrete_action}
         instance = cls(**init_dict)

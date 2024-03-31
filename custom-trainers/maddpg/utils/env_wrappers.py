@@ -36,7 +36,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
 class SubprocVecEnv(VecEnv):
     def __init__(self, env_fns, spaces=None):
         """
-        envs: list of gym environments to run in subprocesses
+        envs: list of pettingzoo environments to run in subprocesses
         """
         self.waiting = False
         self.closed = False
@@ -102,11 +102,6 @@ class DummyVecEnv(VecEnv):
                         [env.observation_space(a) for a in agent_ids],
                         [env.action_space(a) for a in agent_ids],
                         agent_ids)
-        # if all([hasattr(a, 'adversary') for a in env.agents]):
-        #    self.agent_types = ['adversary' if a.adversary else 'agent' for a in
-        #                        env.agents]
-        # else:
-        #    self.agent_types = ['agent' for _ in env.agents]
         self.ts = np.zeros(len(self.envs), dtype='int')
         self.actions = None
 
@@ -121,7 +116,6 @@ class DummyVecEnv(VecEnv):
             if all(done):
                 obs[i] = self.envs[i].reset_env(self.agent_ids)
                 self.ts[i] = 0
-                print(f"Episode of env {i} done")
         self.actions = None
         return np.array(obs), np.array(rews), np.array(dones), infos
 

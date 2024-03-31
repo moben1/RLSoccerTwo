@@ -1,6 +1,4 @@
-import numpy as np
 from torch import Tensor
-import torch
 from torch.autograd import Variable
 from torch.optim import Adam
 from .networks import MLPNetwork
@@ -14,7 +12,7 @@ class DDPGAgent(object):
     critic, exploration noise)
     """
 
-    def __init__(self, num_in_pol, num_out_pol, num_in_critic, hidden_dim=64,
+    def __init__(self, num_in_pol, num_out_pol, num_in_critic, hidden_units=64,
                  actor_lr=5e-4, critic_lr=1e-3, discrete_action=False,
                  agent_id=None):
         """
@@ -25,18 +23,18 @@ class DDPGAgent(object):
         """
         self.agent_id = agent_id
         self.policy = MLPNetwork(num_in_pol, num_out_pol,
-                                 hidden_dim=hidden_dim,
+                                 hidden_units=hidden_units,
                                  constrain_out=True,
                                  discrete_action=discrete_action)
         self.critic = MLPNetwork(num_in_critic, 1,
-                                 hidden_dim=hidden_dim,
+                                 hidden_units=hidden_units,
                                  constrain_out=False)
         self.target_policy = MLPNetwork(num_in_pol, num_out_pol,
-                                        hidden_dim=hidden_dim,
+                                        hidden_units=hidden_units,
                                         constrain_out=True,
                                         discrete_action=discrete_action)
         self.target_critic = MLPNetwork(num_in_critic, 1,
-                                        hidden_dim=hidden_dim,
+                                        hidden_units=hidden_units,
                                         constrain_out=False)
         hard_update(self.target_policy, self.policy)
         hard_update(self.target_critic, self.critic)

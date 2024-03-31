@@ -1,160 +1,181 @@
-from typing import Optional
-import numpy as np
-from mlagents_envs.envs.unity_parallel_env import UnityParallelEnv
-from mlagents_envs.environment import UnityEnvironment
-
+"""
+Main script to train MADDPG agents on Unity environment
+"""
 import argparse
 import os
-from trainer.MADDPG import MADDPG
+from pathlib import Path
+import yaml
+import torch
+import numpy as np
 
-EXECUABLE_PATH = "../CustomSoccer"
+from gym.spaces import Box
 
-EPISODE_NUM = 20  # total episode num during training procedure
-LEARN_INTERVAL = 100  # steps interval between learning time
-RANDOM_STEPS = 5e3  # random steps before the agent start to learn
-TAU = 1e-3  # soft update parameter
-GAMMA = 0.95  # discount factor
-BUFFER_CAPACITY = int(1e6)  # capacity of replay buffer
-BATCH_SIZE = 2048  # batch-size of replay buffer
-ACTOR_LR = 0.0003  # learning rate of actor
-CRITIC_LR = 0.0003  # learning rate of critic
-FINAL_NOISE_SCALE = 0.0  # final noise scale
-INIT_NOISE_SCALE = 0.1  # initial noise scale
+from torch.autograd import Variable
+# from tensorboardX import SummaryWriter
+from utils.make_env import make_parallel_env
+from utils.buffer import ReplayBuffer
+from algorithms.maddpg import MADDPG
+
+CONFIG_PATH = "config\\maddpg\\maddpg.yaml"
+USE_CUDA = torch.cuda.is_available()
 
 
-def get_env(executable: str, seed: Optional[int] = None):
-    """ Get a UnityParallelEnv Wrapped env for the PettingZoo API Wrapper 
-        and the dimension info of the environment.
-
-    Args:
-        ml_env (BaseEnv): The UnityEnvironment that is being wrapped.
-        seed (Optional[int], optional): The seed for the action spaces of the agents.
-
-    Returns:
-        _type_: _description_
+def load_config(config_file):
+    """ Load configuration file from yaml
     """
-    u_env = UnityEnvironment(file_name=executable, seed=seed)
-    new_env = UnityParallelEnv(u_env)
-    print("Agent names:", new_env.agents)
-    print("Current agent:", new_env.agents[0])
-    print("Observation space of first agent:", new_env.observation_spaces[new_env.agents[0]].shape)
-    print("Action space of first agent:", new_env.action_spaces[new_env.agents[0]])
-    new_env.reset()
-    _dim_info = {}
-    for new_agent_id in new_env.agents:
-        _dim_info[new_agent_id] = []  # [obs_dim, act_dim]
-        _dim_info[new_agent_id].append(new_env.observation_space(new_agent_id).shape[0])
-        _dim_info[new_agent_id].append(new_env.action_space(new_agent_id).shape[0])
+    with open(config_file) as f:
+        config_yml = yaml.safe_load(f)
+    return config_yml
 
-    return new_env, _dim_info
+
+def run(config):
+    model_dir = Path('./models/maddpg') / config['Model']['model_name']
+
+    # If continue training, model_name is the path to the model.pt file
+    if config['Model']['continue_training']:
+        print(f'Continuing training from existing model at "{model_dir}"')
+        if not model_dir.exists():
+            raise FileNotFoundError('Could not find model directory')
+    # Else build new model directory path
+    elif not model_dir.exists():
+        curr_run = 'run1'
+    else:
+        exst_run_nums = [int(str(folder.name).split('run')[1]) for folder in
+                         model_dir.iterdir() if
+                         str(folder.name).startswith('run')]
+        if len(exst_run_nums) == 0:
+            curr_run = 'run1'
+        else:
+            curr_run = f'run{max(exst_run_nums) + 1}'
+
+    # Create new run directory
+    if not config['Model']['continue_training']:
+        run_dir = model_dir / curr_run
+        log_dir = run_dir / 'logs'
+        os.makedirs(log_dir)
+
+    logger = None  # SummaryWriter(str(log_dir))
+
+    # Set random seeds
+    torch.manual_seed(config['Environment']['seed'])
+    np.random.seed(config['Environment']['seed'])
+
+    if not USE_CUDA:
+        torch.set_num_threads(config['Torch']['n_training_threads'])
+
+    # Loading Unity environment
+    env = make_parallel_env(**config['Environment'])
+
+    # Load or create model
+    if config['Model']['continue_training']:
+        maddpg = MADDPG.init_from_save(model_dir)
+    else:
+        maddpg = MADDPG.init_from_env(env, **config['Model']['Hyperparameters'])
+
+    # Create replay buffer
+    replay_buffer = ReplayBuffer(config['Model']['Buffer']['buffer_length'],
+                                 maddpg.nagents,
+                                 [obsp.shape[0] for obsp in env.observation_space],
+                                 [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+                                  for acsp in env.action_space])
+
+    # Load config parameters
+    n_episodes = config['Model']['n_episodes']
+    n_rollout_threads = config['Environment']['n_rollout_threads']
+    explore = config['Model']['Exploration']
+    steps_per_update = config['Model']['steps_per_update']
+    save_interval = config['Model']['save_interval']
+    batch_size = config['Model']['Buffer']['batch_size']
+    rollout_dev = config['Torch']['rollout_dev']
+    train_dev = config['Torch']['train_dev']
+
+    # Start training
+    t = 0
+    for ep_i in range(0, n_episodes, n_rollout_threads):
+        print(f"New Episode : {ep_i + 1}-{ep_i + 1 + n_rollout_threads} of {n_episodes}")
+        obs = env.reset()
+
+        maddpg.prep_rollouts(device='cpu')
+
+        # Decay exploration noise
+        explr_pct_remaining = max(0, explore['n_exploration_eps'] - ep_i) / explore['n_exploration_eps']
+        maddpg.scale_noise(explore['final_noise_scale'] + (explore['init_noise_scale']
+                           - explore['final_noise_scale']) * explr_pct_remaining)
+        maddpg.reset_noise()
+
+        ep_len = 0
+        envs_dones = [False for _ in range(n_rollout_threads)]
+        while not all(envs_dones):  # interact with the env for an episode
+            ep_len += 1
+            # rearrange observations to be per agent, and convert to torch Variable
+            torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
+                                  requires_grad=False)
+                         for i in range(maddpg.nagents)]
+            # get actions as torch Variables
+            torch_agent_actions = maddpg.step(torch_obs, explore=True)
+            # convert actions to numpy arrays
+            agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
+            # rearrange actions to be per environment
+            actions = [[ac[i] for ac in agent_actions] for i in range(n_rollout_threads)]
+
+            # step environment, store transition in replay buffer
+            next_obs, rewards, dones, infos = env.step(actions)
+            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+
+            obs = next_obs
+            t += n_rollout_threads
+
+            # Update all agents each steps_per_update step
+            if (len(replay_buffer) >= batch_size
+                    and (t % steps_per_update) < n_rollout_threads):
+                if USE_CUDA:
+                    maddpg.prep_training(device='gpu')
+                else:
+                    maddpg.prep_training(device=train_dev)
+                for u_i in range(n_rollout_threads):
+                    for a_i in range(maddpg.nagents):
+                        sample = replay_buffer.sample(batch_size, to_gpu=USE_CUDA)
+                        maddpg.update(sample, a_i, logger=logger)
+                    maddpg.update_all_targets()
+                maddpg.prep_rollouts(device=rollout_dev)
+
+            for i, done in enumerate(dones):
+                if all(done) :
+                    print(f"Episode {ep_i} of environment {i} over in {ep_len} steps")
+                    envs_dones[i] = True
+
+        # Compute mean episode rewards per agent
+        ep_rews = replay_buffer.get_average_rewards(ep_len * n_rollout_threads)
+        print("Episode mean rewards: ")
+        for a_i, a_ep_rew in enumerate(ep_rews):
+            print(f"\t{maddpg.agents_id[a_i]} : {a_ep_rew}")
+            # logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
+
+        # Save model after every save_interval episodes
+        if ep_i % save_interval < n_rollout_threads:
+            os.makedirs(run_dir / 'incremental', exist_ok=True)
+            maddpg.save(run_dir / 'incremental' / f'model_ep{ep_i + 1}.pt')
+            maddpg.save(run_dir / 'model.pt')
+
+    # Final save
+    maddpg.save(run_dir / 'model.pt')
+    env.close()
+    # logger.export_scalars_to_json(str(log_dir / 'summary.json'))
+    # logger.close()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run_id', type=str, help='id to save the run', default='unnamed_test_run')
-    parser.add_argument('--episode_num', type=int, default=EPISODE_NUM,
-                        help='total episode num during training procedure')
-    parser.add_argument('--learn_interval', type=int, default=LEARN_INTERVAL,
-                        help='steps interval between learning time')
-    parser.add_argument('--random_steps', type=int, default=RANDOM_STEPS,
-                        help='random steps before the agent start to learn')
-    parser.add_argument('--tau', type=float, default=TAU, help='soft update parameter')
-    parser.add_argument('--gamma', type=float, default=GAMMA, help='discount factor')
-    parser.add_argument('--buffer_capacity', type=int, default=BUFFER_CAPACITY, help='capacity of replay buffer')
-    parser.add_argument('--batch_size', type=int, default=BATCH_SIZE, help='batch-size of replay buffer')
-    parser.add_argument('--actor_lr', type=float, default=ACTOR_LR, help='learning rate of actor')
-    parser.add_argument('--critic_lr', type=float, default=CRITIC_LR, help='learning rate of critic')
-    parser.add_argument("--init_noise_scale", default=INIT_NOISE_SCALE, type=float)
-    parser.add_argument("--final_noise_scale", default=FINAL_NOISE_SCALE, type=float)
+    parser.add_argument('--config',
+                        help='Yaml file with configurations for training',
+                        type=str, default=CONFIG_PATH)
+    parser.add_argument('--model_name',
+                        help='Name of directory to store model/training contents',
+                        type=str, default=None)
     args = parser.parse_args()
 
-    # create folder to save result
-    env_dir = os.path.join('./results', args.run_id)
-    if not os.path.exists(env_dir):
-        os.makedirs(env_dir)
-    total_files = len(list(os.listdir(env_dir)))
-    result_dir = os.path.join(env_dir, f'{total_files + 1}')
-    os.makedirs(result_dir)
+    config = load_config(args.config)
+    if args.model_name is not None:
+        config['Model']['model_name'] = args.model_name
 
-    env, dim_info = get_env(EXECUABLE_PATH)
-    maddpg = MADDPG(dim_info,
-                    args.buffer_capacity,
-                    args.batch_size,
-                    args.actor_lr,
-                    args.critic_lr,
-                    result_dir
-                    )
-
-    step = 0  # global step counter
-    agent_num = env.num_agents
-    # reward of each episode of each agent
-    episode_rewards = {agent_id: np.zeros(args.episode_num) for agent_id in env.agents}
-    for episode in range(args.episode_num):
-        obs = env.reset()
-        agent_reward = {agent_id: 0 for agent_id in env.agents}  # agent reward of the current episode
-
-        # update noise scale
-        explr_pct_remaining = max(0, args.init_noise_scale - episode) / args.episode_num
-        maddpg.scale_noise(args.final_noise_scale + (args.init_noise_scale
-                           - args.final_noise_scale) * explr_pct_remaining)
-        maddpg.reset_noise()
-
-        while env.agents:  # interact with the env for an episode
-            step += 1
-            if step < args.random_steps:
-                action = {agent_id: np.clip(env.action_space(agent_id).sample(), -1.0, 1.0) for agent_id in env.agents}
-            else:
-                action = maddpg.select_action(obs, explore=True)
-
-            next_obs, reward, done, info = env.step(action)
-            maddpg.add(obs, action, reward, next_obs, done)
-            for agent_id, r in reward.items():  # update reward
-                agent_reward[agent_id] += r
-
-            if step >= args.random_steps and step % args.learn_interval == 0:  # learn every few steps
-                maddpg.learn(args.batch_size, args.gamma)
-                maddpg.update_target(args.tau)
-
-            obs = next_obs
-            if all(done.values()):
-                print("FINISHING EPISONDE CAUSE IT4S DONE\n")
-                break
-
-        # episode finishes
-        for agent_id, r in agent_reward.items():  # record reward
-            episode_rewards[agent_id][episode] = r
-
-        # if (episode + 1) % 100 == 0:  # print info every 100 episodes
-        message = f'episode {episode + 1}, '
-        sum_reward = 0
-        for agent_id, r in agent_reward.items():  # record reward
-            message += f'{agent_id}: {r:>4f}; '
-            sum_reward += r
-        message += f'sum reward: {sum_reward}'
-        print(message)
-
-    maddpg.save(episode_rewards)  # save model
-
-    # def get_running_reward(arr: np.ndarray, window=100):
-    #    """calculate the running reward, i.e. average of last `window` elements from rewards"""
-    #    running_reward = np.zeros_like(arr)
-    #    for i in range(window - 1):
-    #        running_reward[i] = np.mean(arr[:i + 1])
-    #    for i in range(window - 1, len(arr)):
-    #        running_reward[i] = np.mean(arr[i - window + 1:i + 1])
-    #    return running_reward
-
-    # training finishes, plot reward
-    # fig, ax = plt.subplots()
-    # x = range(1, args.episode_num + 1)
-    # for agent_id, reward in episode_rewards.items():
-    #    ax.plot(x, reward, label=agent_id)
-    #    ax.plot(x, get_running_reward(reward))
-    # ax.legend()
-    # ax.set_xlabel('episode')
-    # ax.set_ylabel('reward')
-    # title = f'training result of maddpg solve {args.env_name}'
-    # ax.set_title(title)
-    # plt.savefig(os.path.join(result_dir, title))
-
-    env.close()
+    run(config)

@@ -139,7 +139,8 @@ class VecEnvWrapper(VecEnv):
         self.venv = venv
         super().__init__(num_envs=venv.num_envs,
                          observation_space=observation_space or venv.observation_space,
-                         action_space=action_space or venv.action_space)
+                         action_space=action_space or venv.action_space,
+                         agent_ids=venv.agent_ids)
 
     def step_async(self, actions):
         self.venv.step_async(actions)

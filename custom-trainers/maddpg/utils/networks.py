@@ -7,8 +7,8 @@ class MLPNetwork(nn.Module):
     MLP network (can be used as value or policy)
     """
 
-    def __init__(self, input_dim, out_dim, hidden_dim=64, nonlin=F.relu,
-                 constrain_out=False, norm_in=True, discrete_action=True):
+    def __init__(self, input_dim, out_dim, hidden_units=64, nonlin=F.relu,
+                 constrain_out=False, norm_in=True, discrete_action=False):
         """
         Inputs:
             input_dim (int): Number of dimensions in input
@@ -24,9 +24,9 @@ class MLPNetwork(nn.Module):
             self.in_fn.bias.data.fill_(0)
         else:
             self.in_fn = lambda x: x
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.fc3 = nn.Linear(hidden_dim, out_dim)
+        self.fc1 = nn.Linear(input_dim, hidden_units)
+        self.fc2 = nn.Linear(hidden_units, hidden_units)
+        self.fc3 = nn.Linear(hidden_units, out_dim)
         self.nonlin = nonlin
         if constrain_out and not discrete_action:
             # initialize small to prevent saturation

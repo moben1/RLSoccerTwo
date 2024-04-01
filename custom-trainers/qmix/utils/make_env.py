@@ -123,6 +123,6 @@ def make_env(executable=None, seed=None, benchmark=False, discrete_action=False)
     print("\tFirst agent:", pz_env.agents[0])
     print("\tObservation space of first agent:", pz_env.observation_spaces[pz_env.agents[0]].shape)
     print("\tAction space of first agent:", pz_env.action_spaces[pz_env.agents[0]])
-    pz_env.reset_env(pz_env.agents)
+    pz_env.reset()
 
     return pz_env

@@ -6,14 +6,31 @@ from torch import Tensor
 from torch.distributions import Categorical, MultivariateNormal
 
 from algorithms.qmix import QMix
-from utils.config_utils import ConfigObjectFactory
 
+config_train = {
+    "epochs": 100000,
+    "evaluate_epoch" : 1,
+    "show_evaluate_epoch" : 20,
+    "memory_batch" : 32,
+    "memory_size" : 1000,
+    "run_episode_before_train" : 3,  # Run several episodes with the same strategy, used in on-policy algorithms
+    "learn_num" : 2,
+    "lr_actor" : 1e-4,
+    "lr_critic" : 1e-3,
+    "gamma" : 0.99,  # reward discount factor
+    "epsilon" : 0.7,
+    "grad_norm_clip" : 10,
+    "target_update_cycle" : 100,
+    "save_epoch" : 1000,
+    "model_dir" : r"./models",
+    "result_dir" : r"./results",
+    "cuda" : True,
+}
 
-class QmixAgent:
+class QmixAgents:
     def __init__(self, env_info):
         self.env_info = env_info
-        self.train_config = ConfigObjectFactory.get_train_config()
-        self.env_config = ConfigObjectFactory.get_environment_config()
+        self.train_config = config_train
         self.n_agents = len(self.env_info.agents)
 
         if self.train_config.cuda:
@@ -35,7 +52,7 @@ class QmixAgent:
         obs = torch.stack([torch.Tensor(value) for value in obs.values()], dim=0)
         self.policy.init_hidden(1)
         actions_ind = [i for i in range(self.n_actions)]
-        for i, agent in enumerate(self.env_info['agents_name']):
+        for i, agent in enumerate(self.env_info.agents):
             inputs = list()
             inputs.append(obs[i, :])
             inputs.append(torch.zeros(self.n_actions))

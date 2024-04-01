@@ -5,15 +5,32 @@ import torch
 from numpy import ndarray
 from torch import Tensor
 
-from utils.config_utils import *
-from utils.train_utils import reshape_tensor_from_list
-
 LOCK_MEMORY = threading.Lock()
+
+config = {
+    "epochs": 100000,
+    "evaluate_epoch" : 1,
+    "show_evaluate_epoch" : 20,
+    "memory_batch" : 32,
+    "memory_size" : 1000,
+    "run_episode_before_train" : 3,  # Run several episodes with the same strategy, used in on-policy algorithms
+    "learn_num" : 2,
+    "lr_actor" : 1e-4,
+    "lr_critic" : 1e-3,
+    "gamma" : 0.99,  # reward discount factor
+    "epsilon" : 0.7,
+    "grad_norm_clip" : 10,
+    "target_update_cycle" : 100,
+    "save_epoch" : 1000,
+    "model_dir" : r"./models",
+    "result_dir" : r"./results",
+    "cuda" : True,
+}
 
 
 class CommBatchEpisodeMemory(object):
     """
-        存储每局游戏的记忆单元, 适用于常规marl算法(grid_net除外)
+        Memory cells for storing information of each game, suitable for conventional marl algorithms 
     """
 
     def __init__(self, continuous_actions: bool, n_actions: int = 0, n_agents: int = 0):
@@ -67,8 +84,8 @@ class CommBatchEpisodeMemory(object):
 
     def get_batch_data(self) -> dict:
         """
-            获取一个batch的数据
-            :return:一个batch的数据使用字典封装
+        Fetch a batch of data
+        :return: A batch of data encapsulated in a dictionary
         """
         obs = torch.stack(self.obs_buffs, dim=0)
         state = torch.stack(self.state, dim=0)
@@ -88,11 +105,11 @@ class CommBatchEpisodeMemory(object):
 
 class CommMemory(object):
     """
-        存储所有游戏的记忆单元, 适用于常规marl算法(grid_net除外)
+        Memory cells for storing information of all games, suitable for conventional MARL algorithms
     """
 
     def __init__(self):
-        self.train_config = ConfigObjectFactory.get_train_config()
+        self.train_config = config
         self.memory_size = self.train_config.memory_size
         self.current_idx = 0
         self.memory = []
@@ -124,10 +141,9 @@ class CommMemory(object):
 
     def sample(self, batch_size) -> dict:
         """
-            从记忆单元中随机抽样，但是每一局游戏的step不同，找出这个batch中
-            最大的那个，将其他游戏的数据补齐
-            :param batch_size: 一个batch的大小
-            :return: 一个batch的数据
+        Randomly sample from the memory cells, but the number of steps in each game is different. Find the largest number of steps in this batch, and pad the data for other games to match.
+        :param batch_size: The size of a batch
+        :return: A batch of data
         """
         sample_size = min(len(self.memory), batch_size)
         sample_list = sample(self.memory, sample_size)
@@ -197,3 +213,23 @@ class CommMemory(object):
 
     def get_memory_real_size(self):
         return len(self.memory)
+
+
+
+def reshape_tensor_from_list(tensor: Tensor, shape_list: list) -> list:
+    """
+    Split the tensor according to the shape_list, to address the issue of different game lengths within a batch (this might not be an issue in PettingZoo, but it exists in SMAC), by placing the tensor into a list.
+    :param tensor: The input tensor
+    :param shape_list: A list of lengths for each game
+    :return: The tensor split according to the lengths of each game, with the results encapsulated in a list
+    """
+    if len(tensor) != sum(shape_list):
+        raise ValueError("value error: len(tensor.shape) not equals sum(shape_list)")
+    if len(tensor.shape) != 1:
+        raise ValueError("value error: len(tensor.shape) != 1")
+    rewards = []
+    current_index = 0
+    for i in shape_list:
+        rewards.append(tensor[current_index:current_index + i])
+        current_index += i
+    return rewards

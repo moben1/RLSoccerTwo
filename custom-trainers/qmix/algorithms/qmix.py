@@ -4,14 +4,33 @@ import torch
 from torch import Tensor
 
 from utils.networks import RNN, QMixNet, weight_init
-from utils.config_utils import ConfigObjectFactory
+
+
+train_config = {
+    "epochs": 100000,
+    "evaluate_epoch" : 1,
+    "show_evaluate_epoch" : 20,
+    "memory_batch" : 32,
+    "memory_size" : 1000,
+    "run_episode_before_train" : 3,  # Run several episodes with the same strategy, used in on-policy algorithms
+    "learn_num" : 2,
+    "lr_actor" : 1e-4,
+    "lr_critic" : 1e-3,
+    "gamma" : 0.99,  # reward discount factor
+    "epsilon" : 0.7,
+    "grad_norm_clip" : 10,
+    "target_update_cycle" : 100,
+    "save_epoch" : 1000,
+    "model_dir" : r"./models",
+    "result_dir" : r"./results",
+    "cuda" : True,
+}
 
 
 class QMix(object):
 
     def __init__(self, env_info: dict):
-        self.train_config = ConfigObjectFactory.get_train_config()
-        self.env_config = ConfigObjectFactory.get_environment_config()
+        self.train_config = train_config
         self.n_agents = len(env_info.agents)
         self.n_actions = env_info.action_spaces[env_info.agents[0]].n
         state_space = env_info.observation_spaces[env_info.agents].shape[0]
@@ -30,8 +49,8 @@ class QMix(object):
         self.optimizer = torch.optim.RMSprop(self.eval_parameters, lr=self.train_config.lr_critic)
 
         # Initialize the path to save the model and the result
-        self.model_path = os.path.join(self.train_config.model_dir, self.env_config.learn_policy)
-        self.result_path = os.path.join(self.train_config.result_dir, self.env_config.learn_policy)
+        self.model_path = os.path.join(self.train_config.model_dir, "qmix")
+        self.result_path = os.path.join(self.train_config.result_dir, "qmix")
         self.init_path(self.model_path, self.result_path)
         self.rnn_eval_path = os.path.join(self.model_path, "rnn_eval.pth")
         self.rnn_target_path = os.path.join(self.model_path, "rnn_target.pth")

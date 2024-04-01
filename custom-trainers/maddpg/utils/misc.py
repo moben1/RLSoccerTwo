@@ -105,3 +105,16 @@ def gumbel_softmax(logits, temperature=1.0, hard=False):
         y_hard = onehot_from_logits(y)
         y = (y_hard - y).detach() + y
     return y
+
+
+def get_curr_run(model_dir):
+    if not model_dir.exists():
+        return 'run1'
+    else:
+        exst_run_nums = [int(str(folder.name).split('run')[1]) for folder in
+                         model_dir.iterdir() if
+                         str(folder.name).startswith('run')]
+        if len(exst_run_nums) == 0:
+            return 'run1'
+        else:
+            return f'run{max(exst_run_nums) + 1}'

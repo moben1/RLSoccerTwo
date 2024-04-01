@@ -156,7 +156,7 @@ class MADDPG(object):
         stats = {'vf_loss': vf_loss,
                  'pol_loss': pol_loss,
                  'it': self.niter}
-        logging.debug("Updating {stats}")
+        logging.debug(f"Updating {stats}")
 
     def update_all_targets(self):
         """

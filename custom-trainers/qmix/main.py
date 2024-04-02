@@ -64,6 +64,7 @@ config = {
 
 }
 
+
 def run(config):
     global result_buffer
     model_dir = Path('./models/qmix') / config.model_name
@@ -106,16 +107,15 @@ def run(config):
     agents = QmixAgents(env_info=env)
 
     replay_buffer = CommMemory()
-    batch_episode_memory = CommBatchEpisodeMemory(continuous_actions=False, n_actions=env.action_spaces[env.agents[0]].n,
+    batch_episode_memory = CommBatchEpisodeMemory(continuous_actions=False, n_actions=env.action_spaces[env.agents[0]].shape[0],
                                                   n_agents=len(env.agents))
-    
+
     t = 0
     for epoch in range(config.n_episodes):
         print(f"New episode: {epoch + 1} of {config.n_episodes}")
         obs = env.reset()
-        terminated = False
 
-        obs = env.reset()[0]
+        # obs = env.reset()[0]
         finish_game = False
         cycle = 0
         while not finish_game and cycle < MAX_CYCLES:
@@ -124,8 +124,8 @@ def run(config):
             obs_next, rewards, finish_game, infos = env.step(actions_with_name)
             state_next = env.state()
             batch_episode_memory.store_one_episode(one_obs=obs, one_state=state, action=actions,
-                                                            reward=rewards, one_obs_next=obs_next,
-                                                            one_state_next=state_next)
+                                                   reward=rewards, one_obs_next=obs_next,
+                                                   one_state_next=state_next)
             total_reward += rewards
             obs = obs_next
             cycle += 1
@@ -134,8 +134,8 @@ def run(config):
         replay_buffer.store_episode(batch_episode_memory)
         batch_episode_memory.clear_memories()
         if replay_buffer.get_memory_real_size() >= 10:
-            for i in range(train_config.learn_num):
-                batch = replay_buffer.sample(train_config.memory_batch)
+            for i in range(train_config["learn_num"]):
+                batch = replay_buffer.sample(train_config["memory_batch"])
                 agents.learn(batch, epoch)
         one_result_buffer = [total_reward]
         result_buffer.append(one_result_buffer)
@@ -155,7 +155,7 @@ def run(config):
 #         with open(memory_path, 'wb') as f:
 #             memory.episode = episode
 #             pickle.dump(memory, f)
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

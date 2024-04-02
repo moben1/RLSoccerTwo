@@ -110,7 +110,7 @@ class CommMemory(object):
 
     def __init__(self):
         self.train_config = config
-        self.memory_size = self.train_config.memory_size
+        self.memory_size = self.train_config["memory_size"]
         self.current_idx = 0
         self.memory = []
 
@@ -152,15 +152,15 @@ class CommMemory(object):
 
         obs = torch.stack(
             [torch.cat([one_data['obs'],
-                        torch.zeros([max_step - one_data['obs'].shape[0]] +
-                                    list(one_data['obs'].shape[1:]))
+                        torch.zeros([max_step - one_data['obs'].shape[0]]
+                                    + list(one_data['obs'].shape[1:]))
                         ])
              for one_data in sample_list], dim=0).detach()
 
         obs_next = torch.stack(
             [torch.cat([one_data['obs_next'],
                         torch.zeros(size=[max_step - one_data['obs_next'].shape[0]] +
-                                         list(one_data['obs_next'].shape[1:]))])
+                                    list(one_data['obs_next'].shape[1:]))])
              for one_data in sample_list], dim=0).detach()
 
         state = torch.stack(
@@ -213,7 +213,6 @@ class CommMemory(object):
 
     def get_memory_real_size(self):
         return len(self.memory)
-
 
 
 def reshape_tensor_from_list(tensor: Tensor, shape_list: list) -> list:

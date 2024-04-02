@@ -3,7 +3,6 @@ Main script to train MADDPG agents on Unity environment
 """
 import os
 from pathlib import Path
-from typing import Any, Dict
 import logging
 import torch
 from torch.autograd import Variable
@@ -14,10 +13,9 @@ from gym.spaces import Box
 from utils.make_env import make_parallel_env
 from utils.buffer import ReplayBuffer
 from algorithms.maddpg import MADDPG
-from utils.misc import get_curr_run
 
 
-def train(config: Dict[str: Any], use_cuda: bool) -> None:
+def train(config: dict, use_cuda: bool) -> None:
     """ Train MADDPG agents on Unity environment
 
     Args:
@@ -27,17 +25,11 @@ def train(config: Dict[str: Any], use_cuda: bool) -> None:
     Raises:
         FileNotFoundError: raised if the model should be loaded from a non-existent directory
     """
-    model_dir = Path('./models/maddpg') / config['Model']['model_name']
 
-    # Setting up the run directory
-    curr_run = get_curr_run(model_dir)
-    run_dir = model_dir / curr_run
-    log_dir = run_dir / 'logs'
-    os.makedirs(log_dir)
-
-    logging.info(f"Starting training in : {run_dir}")
+    logging.info(f"Starting training in : {config['run_dir']}")
     if config['Model']['load_from'] is not None:
-        if not model_dir.exists():
+        config['Model']['load_from'] = Path(config['Model']['load_from'])
+        if not config['Model']['load_from'].exists():
             logging.error(f"Could not find model directory {config['Model']['load_from']}")
             raise FileNotFoundError(f"Could not find model directory {config['Model']['load_from']}")
         logging.info(f"Continuing training from model : {config['Model']['load_from']}")
@@ -156,15 +148,13 @@ def train(config: Dict[str: Any], use_cuda: bool) -> None:
 
         # Save model after every save_interval episodes
         if ep_i % save_interval < n_rollout_threads:
-            logging.info(f"Saving model at {run_dir / 'incremental' / f'model_ep{ep_i + 1}.pt'}")
-            os.makedirs(run_dir / 'incremental', exist_ok=True)
-            maddpg.save(run_dir / 'incremental' / f'model_ep{ep_i + 1}.pt')
-            maddpg.save(run_dir / 'model.pt')
+            logging.info(f"Saving model at {config['run_dir'] / 'incremental' / f'model_ep{ep_i + 1}.pt'}")
+            os.makedirs(config['run_dir'] / 'incremental', exist_ok=True)
+            maddpg.save(config['run_dir'] / 'incremental' / f'model_ep{ep_i + 1}.pt')
+            maddpg.save(config['run_dir'] / 'model.pt')
 
     # Final save
     logging.info(f"Training complete. Saving final model.")
-    logging.info(f"Saving model {run_dir / 'model.pt'}")
-    maddpg.save(run_dir / 'model.pt')
+    logging.info(f"Saving model {config['run_dir'] / 'model.pt'}")
+    maddpg.save(config['run_dir'] / 'model.pt')
     env.close()
-    # logger.export_scalars_to_json(str(log_dir / 'summary.json'))
-    # logger.close()

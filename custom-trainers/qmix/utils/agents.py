@@ -24,8 +24,9 @@ config_train = {
     "save_epoch" : 1000,
     "model_dir" : r"./models",
     "result_dir" : r"./results",
-    "cuda" : True,
+    "cuda" : False,
 }
+
 
 class QmixAgents:
     def __init__(self, env_info):
@@ -33,13 +34,13 @@ class QmixAgents:
         self.train_config = config_train
         self.n_agents = len(self.env_info.agents)
 
-        if self.train_config.cuda:
+        if self.train_config["cuda"]:
             torch.cuda.empty_cache()
             self.device = torch.device('cuda:0')
         else:
             self.device = torch.device('cpu')
 
-        self.n_actions = self.env_info.action_spaces[self.env_info.agents[0]].n
+        self.n_actions = self.env_info.action_spaces[self.env_info.agents[0]].shape[0]
         self.policy = QMix(self.env_info)
 
     def learn(self, batch_data: dict, episode_num: int = 0):
@@ -49,7 +50,7 @@ class QmixAgents:
         actions_with_name = {}
         actions = []
         log_probs = []
-        obs = torch.stack([torch.Tensor(value) for value in obs.values()], dim=0)
+        obs = torch.stack([torch.Tensor(value[0]) for value in obs.values()], dim=0)
         self.policy.init_hidden(1)
         actions_ind = [i for i in range(self.n_actions)]
         for i, agent in enumerate(self.env_info.agents):
@@ -63,7 +64,7 @@ class QmixAgents:
             with torch.no_grad():
                 hidden_state = self.policy.eval_hidden[:, i, :]
                 q_value, _ = self.policy.rnn_eval(inputs, hidden_state)
-            if random.uniform(0, 1) > self.train_config.epsilon:
+            if random.uniform(0, 1) > self.train_config["epsilon"]:
                 action = random.sample(actions_ind, 1)[0]
             else:
                 action = int(torch.argmax(q_value.squeeze()))

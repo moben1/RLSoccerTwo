@@ -23,22 +23,22 @@ train_config = {
     "save_epoch" : 1000,
     "model_dir" : r"./models",
     "result_dir" : r"./results",
-    "cuda" : True,
+    "cuda" : False,
 }
 
 
 class QMix(object):
 
-    def __init__(self, env_info: dict):
-        self.train_config = train_config
+    def __init__(self, env_info):
         self.n_agents = len(env_info.agents)
-        self.n_actions = env_info.action_spaces[env_info.agents[0]].n
-        state_space = env_info.observation_spaces[env_info.agents].shape[0]
-        input_shape = state_space + self.n_agents * self.n_actions
+        self.n_actions = env_info.action_spaces[env_info.agents[0]].shape[0]
+        state_space = env_info.observation_spaces[env_info.agents[0]].shape[0]
+        input_shape = state_space + self.n_agents + self.n_actions
 
         # Neural network configuration
         self.rnn_hidden_dim = 64
         # The network agent for each agent to select the action
+        # TODO: adjust output of rnn for multidiscrete
         self.rnn_eval = RNN(input_shape, self.n_actions, self.rnn_hidden_dim)
         self.rnn_target = RNN(input_shape, self.n_actions, self.rnn_hidden_dim)
         # The network for mixing the q value of agents
@@ -46,19 +46,18 @@ class QMix(object):
         self.qmix_net_target = QMixNet(self.n_agents, state_space)
         self.init_weight()
         self.eval_parameters = list(self.qmix_net_eval.parameters()) + list(self.rnn_eval.parameters())
-        self.optimizer = torch.optim.RMSprop(self.eval_parameters, lr=self.train_config.lr_critic)
+        self.optimizer = torch.optim.RMSprop(self.eval_parameters, lr=train_config['lr_critic'])
 
         # Initialize the path to save the model and the result
-        self.model_path = os.path.join(self.train_config.model_dir, "qmix")
-        self.result_path = os.path.join(self.train_config.result_dir, "qmix")
-        self.init_path(self.model_path, self.result_path)
+        self.model_path = os.path.join(train_config['model_dir'], "qmix")
+        self.result_path = os.path.join(train_config['result_dir'], "qmix")
         self.rnn_eval_path = os.path.join(self.model_path, "rnn_eval.pth")
         self.rnn_target_path = os.path.join(self.model_path, "rnn_target.pth")
         self.qmix_net_eval_path = os.path.join(self.model_path, "qmix_net_eval.pth")
         self.qmix_net_target_path = os.path.join(self.model_path, "qmix_net_target.pth")
 
         # GPU configuration
-        if self.train_config.cuda:
+        if train_config['cuda']:
             torch.cuda.empty_cache()
             self.device = torch.device('cuda:0')
         else:
@@ -107,7 +106,7 @@ class QMix(object):
         q_total_eval = self.qmix_net_eval(q_evals, state)
         q_total_target = self.qmix_net_target(q_targets, state_next)
 
-        targets = rewards + self.train_config.gamma * q_total_target * terminated
+        targets = rewards + train_config['gamma'] * q_total_target * terminated
         td_error = (q_total_eval - targets.detach())
         # Erase the TD error of the padded experiences
         masked_td_error = terminated * td_error
@@ -115,9 +114,9 @@ class QMix(object):
         loss = (masked_td_error ** 2).sum() / terminated.sum()
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.eval_parameters, self.train_config.grad_norm_clip)
+        torch.nn.utils.clip_grad_norm_(self.eval_parameters, train_config['grad_norm_clip'])
         self.optimizer.step()
-        if episode_num > 0 and episode_num % self.train_config.target_update_cycle == 0:
+        if episode_num > 0 and episode_num % train_config['target_update_cycle'] == 0:
             self.rnn_target.load_state_dict(self.rnn_eval.state_dict())
             self.qmix_net_target.load_state_dict(self.qmix_net_eval.state_dict())
 

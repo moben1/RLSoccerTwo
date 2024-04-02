@@ -14,6 +14,10 @@ class PZWrapper(UnityParallelEnv):
     Wrapper for UnityParallelEnv to make it compatible with the implementation of QMIX.
     """
 
+    def reset(self):
+        temp = super().reset()
+        return {i: temp[a_id]['observation'] for i, a_id in enumerate(temp.keys())}
+
     def _update_action_spaces(self) -> None:
         """ 
         Redefining to initialize action space as float32

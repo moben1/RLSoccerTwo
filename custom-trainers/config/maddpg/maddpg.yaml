@@ -1,17 +1,17 @@
 Environment:
-  executable: "..\\CustomSoccer"
-  no_graphics: True
-  n_rollout_threads: 8
-  use_subprocess: True
+  executable: "../executables/MADDPG_Windows"
+  no_graphics: False
+  n_rollout_threads: 2
+  use_subprocess: False
   seed: 1
 
 Torch:
-  rollout_dev: "cpu"
+  rollout_dev: "gpu"
   train_dev: "cpu"
   n_training_threads: 8
 
 Model:
-  model_name: "The GCP Run"
+  model_name: "Try Run"
   load_from: null
   n_episodes: 10000
   max_steps: 1000

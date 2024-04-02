@@ -103,8 +103,14 @@ def gumbel_softmax(logits, temperature=1.0, hard=False):
     return y
 
 
-def get_curr_run(model_dir):
+def get_curr_run(model_dir: str) -> str:
     """ Given the model directory, get the new run id
+
+    Args:
+        model_dir (str): Model directory
+
+    Returns:
+        str: New run id
     """
     if not model_dir.exists():
         return 'run1'
@@ -116,8 +122,14 @@ def get_curr_run(model_dir):
     return f'run{max(exst_run_nums) + 1}'
 
 
-def load_config(config_file):
+def load_config(config_file: str) -> dict:
     """ Load configuration file from yaml
+
+    Args:
+        config_file (str): Path to the configuration file
+
+    Returns:
+        dict: Configuration dictionary
     """
     with open(config_file, encoding='utf-8') as f:
         config_yml = yaml.safe_load(f)

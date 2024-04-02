@@ -11,7 +11,6 @@ from train import train
 
 CONFIG_PATH = "config/maddpg/maddpg.yaml"
 USE_CUDA = torch.cuda.is_available()
-LOGGING_LEVEL = logging.INFO
 
 
 if __name__ == '__main__':

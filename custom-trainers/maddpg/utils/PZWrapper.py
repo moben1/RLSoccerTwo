@@ -1,3 +1,5 @@
+""" Specialisation of UnityParallelEnv to make it compatible with MADDPG.
+"""
 from typing import Tuple
 import numpy as np
 
@@ -13,27 +15,33 @@ class PZWrapper(UnityParallelEnv):
         of MADDPG.
         It mostly converts in / outputs for the environment to be compatible with
         the MADDPG implementation.
+        Also fix some unexpected behavior from UnityParallelEnv.
     """
 
-    def reset_env(self, agent_ids):
+    def reset_env(self, agent_ids: list):
         """ Reset the environment and return the initial observations.
             Convert the observations to a format compatible with MADDPG.
+            Sending agent_ids to make sure we keep the order of agents.
 
         Args:
             agent_ids (List[str]): List of agent_ids from MADDPG instance
+
+        Returns:
+            np.array: Initial observations
         """
         # giving agent_ids to make sure we keep the order of agents
-        temp = UnityParallelEnv.reset(self)  # Dict agent_id -> 1D array
+        temp = UnityParallelEnv.reset(self)
         return PZWrapper.convert_obs(temp, agent_ids)
 
-    def step_env(self, actions, agent_ids):
+    def step_env(self, actions: list, agent_ids: list):
         """ Step the environment with the given actions and return the next
             observations, rewards, dones and infos.
             Convert the actions to a format compatible with the environment.
             Convert the observations to a format compatible with MADDPG.
+            Sending agent_ids to make sure we keep the order of agents.
 
         Args:
-            actions (_type_): Actions given by MADDPG instance
+            actions (List[str]): Actions given by MADDPG instance
             agent_ids (List[str]): List of agent_ids from MADDPG instance
 
         Returns:
@@ -97,9 +105,8 @@ class PZWrapper(UnityParallelEnv):
             else:
                 action = self._action_to_np(current_action_space, action)
             if not current_action_space.contains(action):  # type: ignore
-                raise error.Error(
-                    f"Invalid action, got {action} but was expecting action from {self.action_space}"
-                )
+                raise error.Error(f"Invalid action, got {action} but "
+                                  f"was expecting action from {self.action_space}")
             if isinstance(current_action_space, spaces.Tuple):
                 action = ActionTuple(action[0], action[1])
             elif isinstance(current_action_space, spaces.MultiDiscrete):
@@ -129,7 +136,7 @@ class PZWrapper(UnityParallelEnv):
             del self._infos[current_agent]
 
     @staticmethod
-    def convert_obs(obs, agent_ids):
+    def convert_obs(obs, agent_ids: list):
         """ Convert the env observations to a format compatible with MADDPG.
         """
         return np.array([obs[agent_id] for agent_id in agent_ids])

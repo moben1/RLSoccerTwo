@@ -1,8 +1,11 @@
+""" MADDPG algorithm implementation
+"""
+import logging
 import torch
 from gym.spaces import Box
+
 from utils.misc import soft_update, average_gradients, onehot_from_logits, gumbel_softmax
 from utils.agents import DDPGAgent
-import logging
 
 MSELoss = torch.nn.MSELoss()
 
@@ -54,10 +57,14 @@ class MADDPG(object):
 
     @property
     def policies(self):
+        """ Return a list of the policies of each ddpg agent
+        """
         return [a.policy for a in self.agents]
 
     @property
     def target_policies(self):
+        """ Return a list of the target policies of each ddpg agent
+        """
         return [a.target_policy for a in self.agents]
 
     def scale_noise(self, scale):
@@ -70,6 +77,8 @@ class MADDPG(object):
             a.scale_noise(scale)
 
     def reset_noise(self):
+        """ Reset noise for each agent
+        """
         for a in self.agents:
             a.reset_noise()
 
@@ -85,7 +94,7 @@ class MADDPG(object):
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
 
-    def update(self, sample, agent_i, parallel=False, logger=None):
+    def update(self, sample, agent_i, parallel=False):
         """
         Update parameters of agent model based on sample from replay buffer
         Inputs:
@@ -156,7 +165,7 @@ class MADDPG(object):
         stats = {'vf_loss': vf_loss,
                  'pol_loss': pol_loss,
                  'it': self.niter}
-        logging.debug(f"Updating {stats}")
+        logging.debug("Updating %s", stats)
 
     def update_all_targets(self):
         """
@@ -168,7 +177,13 @@ class MADDPG(object):
             soft_update(a.target_policy, a.policy, self.tau)
         self.niter += 1
 
-    def prep_training(self, device='gpu'):
+    def prep_training(self, device: str = 'gpu') -> None:
+        """ Prepare networks for training, load to device if necessary
+
+        Args:
+            device (str): Device to load the networks to for training. 
+                          Defaults to 'gpu'.
+        """
         for a in self.agents:
             a.policy.train()
             a.critic.train()
@@ -195,7 +210,17 @@ class MADDPG(object):
                 a.target_critic = fn(a.target_critic)
             self.trgt_critic_dev = device
 
-    def prep_rollouts(self, device='cpu'):
+    def prep_rollouts(self, device: str = 'cpu') -> None:
+        """ Prepare networks for rollouts (inference without training), 
+            load to device if necessary
+
+        Args:
+            device (str): Device to load the networks to for rollout. 
+                          Defaults to 'cpu'.
+
+        Returns:
+            _type_: _description_
+        """
         for a in self.agents:
             a.policy.eval()
         if device == 'gpu':
@@ -218,7 +243,8 @@ class MADDPG(object):
         torch.save(save_dict, filename)
 
     @classmethod
-    def init_from_env(cls, env, gamma=0.95, tau=0.01, actor_lr=5e-4, critic_lr=1e-3, hidden_units=128):
+    def init_from_env(cls, env, gamma=0.95, tau=0.01, actor_lr=5e-4,
+                      critic_lr=1e-3, hidden_units=128):
         """
         Instantiate instance of this class from multi-agent environment
         """

@@ -26,18 +26,18 @@ def train(config: dict, use_cuda: bool) -> None:
         FileNotFoundError: raised if the model should be loaded from a non-existent directory
     """
 
-    logging.info(f"Starting training in : {config['run_dir']}")
+    logging.info("Starting training in : %s", config['run_dir'])
     if config['Model']['load_from'] is not None:
         config['Model']['load_from'] = Path(config['Model']['load_from'])
         if not config['Model']['load_from'].exists():
-            logging.error(f"Could not find model directory {config['Model']['load_from']}")
+            logging.error("Could not find model directory %s", config['Model']['load_from'])
             raise FileNotFoundError(f"Could not find model directory {config['Model']['load_from']}")
-        logging.info(f"Continuing training from model : {config['Model']['load_from']}")
+        logging.info("Continuing training from model : %s", config['Model']['load_from'])
         logging.warning("Model parameters could be different from the current configuration as it is loaded")
 
-    logging.info(f"Environment Configuration : {config['Environment']}")
-    logging.info(f"Model Configuration : {config['Model']}")
-    logging.info(f"Torch Configuration : {config['Torch']}")
+    logging.info("Environment Configuration : %s", config['Environment'])
+    logging.info("Model Configuration : %s", config['Model'])
+    logging.info("Torch Configuration : %s", config['Torch'])
 
     # Set random seeds
     torch.manual_seed(config['Environment']['seed'])
@@ -49,7 +49,7 @@ def train(config: dict, use_cuda: bool) -> None:
 
     # Loading Unity environment
     env = make_parallel_env(**config['Environment'])
-    logging.info(f"Environment loaded")
+    logging.info("Environment loaded")
 
     # Load or create model
     if config['Model']['load_from'] is not None:
@@ -80,7 +80,8 @@ def train(config: dict, use_cuda: bool) -> None:
     # Start training
     t = 0
     for ep_i in range(0, n_episodes, n_rollout_threads):
-        logging.debug(f"Starting episode {ep_i + 1} to {ep_i + n_rollout_threads} of {n_episodes} episodes")
+        logging.debug("Starting episode %i to %i of %i episodes",
+                      ep_i + 1, ep_i + n_rollout_threads, n_episodes)
         obs = env.reset()
 
         maddpg.prep_rollouts(device='cpu')
@@ -91,11 +92,12 @@ def train(config: dict, use_cuda: bool) -> None:
                                                 - explore['final_noise_scale']) * explr_pct_remaining
         maddpg.scale_noise(scale)
         maddpg.reset_noise()
-        logging.debug(f"Decaying noise scale : {scale}")
+        logging.debug("Decaying noise scale : %.4f", scale)
 
+        # interact with the env for an episode
         ep_len = 0
         envs_dones = [False for _ in range(n_rollout_threads)]
-        while not all(envs_dones):  # interact with the env for an episode
+        while not all(envs_dones):
             ep_len += 1
             # rearrange observations to be per agent, and convert to torch Variable
             torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
@@ -109,7 +111,7 @@ def train(config: dict, use_cuda: bool) -> None:
             actions = [[ac[i] for ac in agent_actions] for i in range(n_rollout_threads)]
 
             # step environment, store transition in replay buffer
-            next_obs, rewards, dones, infos = env.step(actions)
+            next_obs, rewards, dones, _ = env.step(actions)
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
 
             obs = next_obs
@@ -129,12 +131,14 @@ def train(config: dict, use_cuda: bool) -> None:
                     maddpg.update_all_targets()
                 maddpg.prep_rollouts(device=rollout_dev)
 
+            # Checking for environment done
             for i, done in enumerate(dones):
                 if all(done) :
-                    logging.debug(f"Episode {ep_i + i} finished after {ep_len} steps")
+                    logging.debug("Episode %i finished after %i steps",
+                                  ep_i + i, ep_len)
                     envs_dones[i] = True
             if ep_len > max_steps:
-                logging.warning(f"Episode {ep_i + i} reached max steps")
+                logging.warning("Episode %i reached max steps", ep_i)
                 break
 
         # Compute mean episode rewards per agent
@@ -144,17 +148,18 @@ def train(config: dict, use_cuda: bool) -> None:
                     'ep_len': ep_len,
                     'mean_rews': {maddpg.agent_ids[i]: ep_rews[i] for i in range(maddpg.nagents)},
                     'noise_scale': scale}
-        logging.info(f"EP stats :{ep_stats}")
+        logging.info("EP stats : %s ", ep_stats)
 
         # Save model after every save_interval episodes
         if ep_i % save_interval < n_rollout_threads:
-            logging.info(f"Saving model at {config['run_dir'] / 'incremental' / f'model_ep{ep_i + 1}.pt'}")
+            logging.info("Saving model at %s", config['run_dir']
+                         / 'incremental' / f'model_ep{ep_i + 1}.pt')
             os.makedirs(config['run_dir'] / 'incremental', exist_ok=True)
             maddpg.save(config['run_dir'] / 'incremental' / f'model_ep{ep_i + 1}.pt')
             maddpg.save(config['run_dir'] / 'model.pt')
 
     # Final save
-    logging.info(f"Training complete. Saving final model.")
-    logging.info(f"Saving model {config['run_dir'] / 'model.pt'}")
+    logging.info("Training complete. Saving final model.")
+    logging.info("Saving model %s", config['run_dir'] / 'model_ep.pt')
     maddpg.save(config['run_dir'] / 'model.pt')
     env.close()

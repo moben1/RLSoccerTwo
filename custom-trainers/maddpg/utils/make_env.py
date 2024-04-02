@@ -1,6 +1,7 @@
 """ 
 Functions to instanciate single or parallel environments for Unity
 """
+from typing import Union
 import numpy as np
 
 from mlagents_envs.environment import UnityEnvironment
@@ -9,29 +10,40 @@ from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 from utils.PZWrapper import PZWrapper
 
 
-def make_env(executable=None, seed=None, worker=0, benchmark=False, no_graphics=False):
-    '''
-    Creates a Wrapped Unity Parallel environment for PettingZoo.
+def make_env(executable: str, seed: int, worker: int = 0, no_graphics: bool = False) -> PZWrapper:
+    """_summary_
 
-    Input:
-        executable      :   the path of the unity exectuable. If none, wait for
-                            the user to press play in the unity editor
-        seed            :   the random seed for the environment
-        worker          :   unity worker to connect with
-        benchmark       :   whether you want to produce benchmarking data
-                            (usually only done during evaluation)
-        discrete_action :   whether the actions should be discrete.
-    Output:
-        pz_env          :  a Unity Wrapped PettingZoo Parallel environment
-    '''
-    u_env = UnityEnvironment(file_name=executable, seed=seed, worker_id=worker, no_graphics=no_graphics)
+    Args:
+        executable (str): Path to the Unity executable, if None, use play in editor.
+        seed (seed): Random seed for the environment
+        worker (int): Unique worker id for the environment
+        no_graphics (bool): Whether to run the environment with graphics or not
+
+    Returns:
+        PZWrapper: Specilised PettingZoo wrapper for the Unity environment
+    """
+    u_env = UnityEnvironment(file_name=executable, seed=seed,
+                             worker_id=worker, no_graphics=no_graphics)
     pz_env = PZWrapper(u_env)
     pz_env.reset_env(pz_env.agents)
 
     return pz_env
 
 
-def make_parallel_env(executable, n_rollout_threads, use_subprocess, seed, no_graphics):
+def make_parallel_env(executable: str, n_rollout_threads: int, use_subprocess: bool,
+                      seed: int, no_graphics: bool) -> Union[SubprocVecEnv, DummyVecEnv]:
+    """ Create parallel instances of a Unity environment wrapped with PettingZoo.
+
+    Args:
+        executable (str): Path to the Unity executable
+        n_rollout_threads (int): Number of parallel instances
+        use_subprocess (bool): Whether to use multiprocessing or not
+        seed (int): initial random seed for the environment
+        no_graphics (bool): Whether to run the environment with graphics or not
+
+    Returns:
+        Union[SubprocVecEnv, DummyVecEnv]: Parallel environments
+    """
     def get_env_fn(rank):
         def init_env():
             s = seed + rank * 1000

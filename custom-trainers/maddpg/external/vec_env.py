@@ -1,3 +1,9 @@
+""" This file is a modified version of the file from OpenAI Gym.
+    We need the VencEnv abstract class to run multiple environments in parallel.
+    VecEnv has been a little modified to work with PettingZoo environments.
+
+"""
+
 # from https://github.com/openai/baselines/blob/master/baselines/common/vec_env/vec_env.py
 
 import contextlib
@@ -47,10 +53,10 @@ class VecEnv(ABC):
         self.observation_space = observation_space
         self.action_space = action_space
         self.agent_ids = agent_ids
-        logging.info(f"Initialized VecEnv with {num_envs} environments")
-        logging.debug(f"Agent IDs: {agent_ids}")
-        logging.debug(f"Observation space: {observation_space}")
-        logging.debug(f"Action space: {action_space}")
+        logging.info("Initialized VecEnv with %i environments", num_envs)
+        logging.debug("Agent IDs: %s", agent_ids)
+        logging.debug("Observation space: %s", observation_space)
+        logging.debug("Action space: %s", action_space)
 
     @abstractmethod
     def reset(self):

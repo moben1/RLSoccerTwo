@@ -1,8 +1,8 @@
+""" Interfaces dor managing multiple instances of pettingzoo environments
 """
-Modified from OpenAI Baselines code to work with multi-agent envs
-"""
-import numpy as np
 from multiprocessing import Process, Pipe
+import numpy as np
+
 from external.vec_env import VecEnv, CloudpickleWrapper
 
 
@@ -34,6 +34,10 @@ def worker(remote, parent_remote, env_fn_wrapper):
 
 
 class SubprocVecEnv(VecEnv):
+    """ VecEnv that runs multiple environments in parallel in subproceses 
+        and communicates with them via pipes
+    """
+
     def __init__(self, env_fns, spaces=None):
         """
         envs: list of pettingzoo environments to run in subprocesses
@@ -43,7 +47,8 @@ class SubprocVecEnv(VecEnv):
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
         self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-                   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
+                   for (work_remote, remote, env_fn)
+                   in zip(self.work_remotes, self.remotes, env_fns)]
         for p in self.ps:
             p.daemon = True  # if the main process crashes, we should not cause things to hang
             p.start()
@@ -92,6 +97,9 @@ class SubprocVecEnv(VecEnv):
 
 
 class DummyVecEnv(VecEnv):
+    """ Run multiple environments in parallel, but sequentially
+    """
+
     def __init__(self, env_fns):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]

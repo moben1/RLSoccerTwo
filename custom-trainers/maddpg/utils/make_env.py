@@ -5,6 +5,7 @@ from typing import Union
 import numpy as np
 
 from mlagents_envs.environment import UnityEnvironment
+from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
 from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 from utils.PZWrapper import PZWrapper
@@ -22,8 +23,10 @@ def make_env(executable: str, seed: int, worker: int = 0, no_graphics: bool = Fa
     Returns:
         PZWrapper: Specilised PettingZoo wrapper for the Unity environment
     """
+    channel = EngineConfigurationChannel()
     u_env = UnityEnvironment(file_name=executable, seed=seed,
-                             worker_id=worker, no_graphics=no_graphics)
+                             worker_id=worker, no_graphics=no_graphics, side_channels=[channel])
+    channel.set_configuration_parameters(time_scale=20.0)
     pz_env = PZWrapper(u_env)
     pz_env.reset_env(pz_env.agents)
 

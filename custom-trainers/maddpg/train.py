@@ -12,6 +12,7 @@ from gym.spaces import Box
 
 from utils.make_env import make_parallel_env
 from utils.buffer import ReplayBuffer
+from utils.misc import scale_env_properties
 from algorithms.maddpg import MADDPG
 
 
@@ -38,6 +39,7 @@ def train(config: dict, use_cuda: bool) -> None:
     logging.info("Environment Configuration : %s", config['Environment'])
     logging.info("Model Configuration : %s", config['Model'])
     logging.info("Torch Configuration : %s", config['Torch'])
+    logging.info("Scaled properties : %s", config['ScaledProperties'])
 
     # Set random seeds
     torch.manual_seed(config['Environment']['seed'])
@@ -47,8 +49,9 @@ def train(config: dict, use_cuda: bool) -> None:
         logging.warning("CUDA not available.")
         torch.set_num_threads(config['Torch']['n_training_threads'])
 
-    # Loading Unity environment
+    # Loading Unity environment and set time scale
     env = make_parallel_env(**config['Environment'])
+    env.set_time_scale(config['Environment']['time_scale'])
     logging.info("Environment loaded")
 
     # Load or create model
@@ -86,7 +89,9 @@ def train(config: dict, use_cuda: bool) -> None:
 
         maddpg.prep_rollouts(device='cpu')
 
-        # Decay exploration noise
+        # Decay exploration noise and env properties
+        scale_env_properties(env, config['ScaledProperties'], ep_i)
+
         explr_pct_remaining = max(0, explore['n_exploration_eps'] - ep_i) / explore['n_exploration_eps']
         scale = explore['final_noise_scale'] + (explore['init_noise_scale']
                                                 - explore['final_noise_scale']) * explr_pct_remaining

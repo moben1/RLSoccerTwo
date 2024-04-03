@@ -1,22 +1,29 @@
 Environment:
   executable: "../executables/MADDPG_Windows"
-  no_graphics: False
-  n_rollout_threads: 2
-  use_subprocess: False
+  no_graphics: True
+  n_rollout_threads: 8
+  use_subprocess: True
   seed: 1
+  time_scale: 20.0
+
+ScaledProperties:
+  ball_touch:
+    init: 2.0
+    final: 0.0
+    n_episodes: 10000
 
 Torch:
-  rollout_dev: "gpu"
+  rollout_dev: "cuda"
   train_dev: "cpu"
   n_training_threads: 8
 
 Model:
-  model_name: "Try Run"
+  model_name: "Try Decayed Run"
   load_from: null
   n_episodes: 10000
   max_steps: 1000
-  steps_per_update: 100
-  save_interval: 50
+  steps_per_update: 256
+  save_interval: 500
   discrete_action: False
   Buffer:
     buffer_length: 1000000
@@ -27,7 +34,7 @@ Model:
     final_noise_scale: 0.0
   Hyperparameters:
     hidden_units: 128
-    actor_lr: 0.0005
+    actor_lr: 0.0003
     critic_lr: 0.001
     tau: 0.001
     gamma: 0.99

@@ -29,6 +29,10 @@ def worker(remote, parent_remote, env_fn_wrapper):
             remote.send(([env.observation_space(a) for a in data], [env.action_space(a) for a in data]))
         elif cmd == 'get_agent_ids':
             remote.send(env.agents)
+        elif cmd == 'scale_float_property':
+            env.scale_float_property(*data)
+        elif cmd == 'set_time_scale':
+            env.set_time_scale(data)
         else:
             raise NotImplementedError
 
@@ -61,6 +65,25 @@ class SubprocVecEnv(VecEnv):
         observation_space, action_space = self.remotes[0].recv()
 
         VecEnv.__init__(self, len(env_fns), observation_space, action_space, agent_ids)
+
+    def scale_float_property(self, property_name: str, scale: float):
+        """ Scale the float property of each environment.
+
+        Args:
+            property_name (str): Name of the property to scale
+            scale (float): Scale factor
+        """
+        for remote in self.remotes:
+            remote.send(('scale_float_property', (property_name, scale)))
+
+    def set_time_scale(self, scale: float):
+        """ Set the time scale of each environment.
+
+        Args:
+            scale (float): Time scale factor
+        """
+        for remote in self.remotes:
+            remote.send(('set_time_scale', scale))
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
@@ -112,6 +135,25 @@ class DummyVecEnv(VecEnv):
                         agent_ids)
         self.ts = np.zeros(len(self.envs), dtype='int')
         self.actions = None
+
+    def scale_float_property(self, property_name: str, scale: float):
+        """ Scale the float property of each environment.
+
+        Args:
+            property_name (str): Name of the property to scale
+            scale (float): Scale factor
+        """
+        for env in self.envs:
+            env.scale_float_property(property_name, scale)
+
+    def set_time_scale(self, scale: float):
+        """ Set the time scale of each environment.
+
+        Args:
+            scale (float): Time scale factor
+        """
+        for env in self.envs:
+            env.set_time_scale(scale)
 
     def step_async(self, actions):
         self.actions = actions

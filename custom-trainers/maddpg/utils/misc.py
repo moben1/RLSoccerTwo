@@ -1,6 +1,7 @@
 """ Several utility functions for the Model implementation
 """
 import os
+import logging
 import yaml
 import torch
 import torch.nn.functional as F
@@ -135,3 +136,22 @@ def load_config(config_file: str) -> dict:
         config_yml = yaml.safe_load(f)
 
     return config_yml
+
+
+def scale_env_properties(env, props: dict, ep_i: int) -> None:
+    """ Scale the properties of the environment
+
+    Args:
+        env (): Environment wrapper
+        props (dict): Properties to scale each key is the property name in unity
+            and the value is a dictionary with the following keys:
+            - init: inital value
+            - final : final value
+            - n_episodes: number of episodes to scale over
+        ep_i (int): Current episode number
+    """
+    for prop, val in props.items():
+        scale_ep_remaining = max(0, val['n_episodes'] - ep_i) / val['n_episodes']
+        scale = val['final'] + (val['init'] - val['final']) * scale_ep_remaining
+        env.scale_float_property(prop, scale)
+        logging.debug("Decaying %s scale : %.4f", prop, scale)

@@ -11,6 +11,7 @@ from train import train
 
 CONFIG_PATH = "config/maddpg/maddpg.yaml"
 USE_CUDA = torch.cuda.is_available()
+LOGGING_LEVEL = logging.DEBUG
 
 
 if __name__ == '__main__':
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     # Setting up logging
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
                         datefmt='%Y/%m/%d %H:%M:%S',
-                        level=logging.INFO,
+                        level=LOGGING_LEVEL,
                         handlers=[
                             logging.FileHandler(log_dir / 'train.log'),
                             logging.StreamHandler()

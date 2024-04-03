@@ -18,6 +18,18 @@ class PZWrapper(UnityParallelEnv):
         Also fix some unexpected behavior from UnityParallelEnv.
     """
 
+    def __init__(self, env, config_channel, float_channel):
+        """ Initialize the wrapper with the given environment.
+
+        Args:
+            env (UnityEnvironment): The Unity environment to wrap
+            time_channel (EngineConfigurationChannel): The time channel of the environment
+            float_channel (FloatPropertiesChannel): The float channel of the environment
+        """
+        UnityParallelEnv.__init__(self, env)
+        self.config_channel = config_channel
+        self.float_channel = float_channel
+
     def reset_env(self, agent_ids: list):
         """ Reset the environment and return the initial observations.
             Convert the observations to a format compatible with MADDPG.
@@ -55,6 +67,23 @@ class PZWrapper(UnityParallelEnv):
         rewards = PZWrapper.convert_obs(tmp_rewards, agent_ids)
         dones = PZWrapper.convert_obs(tmp_dones, agent_ids)
         return next_obs, rewards, dones, infos
+
+    def scale_float_property(self, property_name: str, scale: float):
+        """ Scale the float property of the environment.
+
+        Args:
+            property_name (str): Name of the property to scale
+            scale (float): Scale factor
+        """
+        self.float_channel.set_property(property_name, scale)
+
+    def set_time_scale(self, scale: float):
+        """ Set the time scale of the environment.
+
+        Args:
+            scale (float): Time scale factor
+        """
+        self.config_channel.set_configuration_parameters(time_scale=scale)
 
     def _update_action_spaces(self) -> None:
         """ Redefining to initialize action space as float32

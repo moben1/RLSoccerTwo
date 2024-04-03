@@ -5,16 +5,18 @@ import os
 from pathlib import Path
 import logging
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from utils.misc import get_curr_run, load_config
 from train import train
 
 CONFIG_PATH = "custom-trainers/config/maddpg/maddpg.yaml"
 USE_CUDA = torch.cuda.is_available()
-LOGGING_LEVEL = logging.DEBUG
+LOGGING_LEVEL = logging.INFO
 
 
 if __name__ == '__main__':
+
     config = load_config(CONFIG_PATH)
 
     # Setting up the run directory
@@ -25,6 +27,8 @@ if __name__ == '__main__':
     os.makedirs(log_dir)
     config['run_dir'] = run_dir
     config['log_dir'] = log_dir
+
+    logger = SummaryWriter(str(log_dir))
 
     # Setting up logging
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
@@ -44,4 +48,4 @@ if __name__ == '__main__':
         config['Torch']['train_dev'] = 'cpu'
 
     # Training the model
-    train(config, USE_CUDA)
+    train(config, USE_CUDA, logger)

@@ -1,10 +1,9 @@
 """ MADDPG algorithm implementation
 """
-import logging
 import torch
 from gym.spaces import Box
 
-from utils.misc import soft_update, average_gradients, onehot_from_logits, gumbel_softmax
+from utils.misc import soft_update, average_gradients, onehot_from_logits, gumbel_softmax, get_agents_infos
 from utils.agents import DDPGAgent
 
 MSELoss = torch.nn.MSELoss()
@@ -35,6 +34,7 @@ class MADDPG(object):
         """
         self.nagents = len(agent_init_params)
         self.agent_ids = [param['agent_id'] for param in agent_init_params]
+        self.log_ids = get_agents_infos(self.agent_ids)
         self.agents = [DDPGAgent(actor_lr=actor_lr, critic_lr=critic_lr,
                                  discrete_action=discrete_action,
                                  hidden_units=hidden_units, **params)
@@ -94,7 +94,7 @@ class MADDPG(object):
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
 
-    def update(self, sample, agent_i, parallel=False):
+    def update(self, sample, agent_i, parallel=False, logger=None):
         """
         Update parameters of agent model based on sample from replay buffer
         Inputs:
@@ -162,10 +162,11 @@ class MADDPG(object):
             average_gradients(curr_agent.policy)
         torch.nn.utils.clip_grad_norm_(curr_agent.policy.parameters(), 0.5)
         curr_agent.policy_optimizer.step()
-        stats = {'vf_loss': vf_loss,
-                 'pol_loss': pol_loss,
-                 'it': self.niter}
-        logging.debug("Updating %s", stats)
+        if logger is not None:
+            logger.add_scalars('%s/losses' % self.log_ids[agent_i],
+                               {'vf_loss': vf_loss,
+                                'pol_loss': pol_loss},
+                               self.niter)
 
     def update_all_targets(self):
         """
@@ -189,9 +190,9 @@ class MADDPG(object):
             a.critic.train()
             a.target_policy.train()
             a.target_critic.train()
-        #if device == 'gpu':
+        # if device == 'gpu':
         #    def fn(x): return x.cuda()
-        #else:
+        # else:
         #    def fn(x): return x.cpu()
         torch_device = torch.device(device)
         if not self.pol_dev == device:
@@ -224,18 +225,18 @@ class MADDPG(object):
         """
         for a in self.agents:
             a.policy.eval()
-        #if device == 'gpu':
+        # if device == 'gpu':
         #    def fn(x): return x.cuda()
-        #else:
+        # else:
         #    def fn(x): return x.cpu()
-        ## only need main policy for rollouts
+        # only need main policy for rollouts
         if device == 'cuda':
             torch_device = torch.device('cuda')
         else:
             torch_device = torch.device('cpu')
         if not self.pol_dev == device:
             for a in self.agents:
-                #a.policy = fn(a.policy)
+                # a.policy = fn(a.policy)
                 a.policy.to(torch_device)
             self.pol_dev = device
 

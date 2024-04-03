@@ -6,6 +6,7 @@ from pathlib import Path
 import logging
 import torch
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 from gym.spaces import Box
@@ -16,7 +17,7 @@ from utils.misc import scale_env_properties
 from algorithms.maddpg import MADDPG
 
 
-def train(config: dict, use_cuda: bool) -> None:
+def train(config: dict, use_cuda: bool, logger: SummaryWriter) -> None:
     """ Train MADDPG agents on Unity environment
 
     Args:
@@ -129,7 +130,7 @@ def train(config: dict, use_cuda: bool) -> None:
                 for _ in range(n_rollout_threads):
                     for a_i in range(maddpg.nagents):
                         sample = replay_buffer.sample(batch_size, to_gpu=use_cuda)
-                        maddpg.update(sample, a_i)
+                        maddpg.update(sample, a_i, logger=logger)
                     maddpg.update_all_targets()
                 maddpg.prep_rollouts(device=rollout_dev)
 
@@ -145,12 +146,15 @@ def train(config: dict, use_cuda: bool) -> None:
 
         # Compute mean episode rewards per agent
         ep_rews = replay_buffer.get_average_rewards(ep_len * n_rollout_threads)
-        ep_stats = {'n_episodes': ep_i,
-                    'n_rollout_threads': n_rollout_threads,
-                    'ep_len': ep_len,
-                    'mean_rews': {maddpg.agent_ids[i]: ep_rews[i] for i in range(maddpg.nagents)},
-                    'noise_scale': scale}
-        logging.info("EP stats : %s ", ep_stats)
+        for a_i, a_ep_rews in zip(maddpg.log_ids, ep_rews):
+            logger.add_scalar('%s/mean_episode_rewards' % a_i, a_ep_rews, ep_i)
+        # ep_rews = replay_buffer.get_average_rewards(ep_len * n_rollout_threads)
+        # ep_stats = {'n_episodes': ep_i,
+        #            'n_rollout_threads': n_rollout_threads,
+        #            'ep_len': ep_len,
+        #            'mean_rews': {maddpg.agent_ids[i]: ep_rews[i] for i in range(maddpg.nagents)},
+        #            'noise_scale': scale}
+        # logging.info("EP stats : %s ", ep_stats)
 
         # Save model after every save_interval episodes
         if ep_i % save_interval < n_rollout_threads:
@@ -165,3 +169,5 @@ def train(config: dict, use_cuda: bool) -> None:
     logging.info("Saving model %s", config['run_dir'] / 'model_ep.pt')
     maddpg.save(config['run_dir'] / 'model.pt')
     env.close()
+    logger.export_scalars_to_json(str(config['log_dir'] / 'summary.json'))
+    logger.close()

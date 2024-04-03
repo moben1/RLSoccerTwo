@@ -155,3 +155,13 @@ def scale_env_properties(env, props: dict, ep_i: int) -> None:
         scale = val['final'] + (val['init'] - val['final']) * scale_ep_remaining
         env.scale_float_property(prop, scale)
         logging.debug("Decaying %s scale : %.4f", prop, scale)
+
+
+def get_agents_infos(agent_ids: list):
+    result = []
+    for a_i in agent_ids:
+        infos = a_i.split('?')
+        team = int(infos[1].split('=')[1])
+        agent_id = int(infos[2].split('=')[1])
+        result.append(f'team{team}_agent{agent_id}')
+    return result

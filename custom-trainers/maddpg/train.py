@@ -87,7 +87,7 @@ def train(config: dict, use_cuda: bool) -> None:
                       ep_i + 1, ep_i + n_rollout_threads, n_episodes)
         obs = env.reset()
 
-        maddpg.prep_rollouts(device='cpu')
+        maddpg.prep_rollouts(device=rollout_dev)
 
         # Decay exploration noise and env properties
         scale_env_properties(env, config['ScaledProperties'], ep_i)
@@ -106,12 +106,12 @@ def train(config: dict, use_cuda: bool) -> None:
             ep_len += 1
             # rearrange observations to be per agent, and convert to torch Variable
             torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
-                                  requires_grad=False)
+                                  requires_grad=False).to(device=rollout_dev)
                          for i in range(maddpg.nagents)]
             # get actions as torch Variables
             torch_agent_actions = maddpg.step(torch_obs, explore=True)
             # convert actions to numpy arrays
-            agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
+            agent_actions = [ac.cpu().data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environment
             actions = [[ac[i] for ac in agent_actions] for i in range(n_rollout_threads)]
 
@@ -125,10 +125,7 @@ def train(config: dict, use_cuda: bool) -> None:
             # Update all agents each steps_per_update step
             if (len(replay_buffer) >= batch_size
                     and (t % steps_per_update) < n_rollout_threads):
-                if use_cuda:
-                    maddpg.prep_training(device='gpu')
-                else:
-                    maddpg.prep_training(device=train_dev)
+                maddpg.prep_training(device=train_dev)
                 for _ in range(n_rollout_threads):
                     for a_i in range(maddpg.nagents):
                         sample = replay_buffer.sample(batch_size, to_gpu=use_cuda)

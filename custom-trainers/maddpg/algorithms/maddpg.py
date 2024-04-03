@@ -177,37 +177,38 @@ class MADDPG(object):
             soft_update(a.target_policy, a.policy, self.tau)
         self.niter += 1
 
-    def prep_training(self, device: str = 'gpu') -> None:
+    def prep_training(self, device: str = 'cuda') -> None:
         """ Prepare networks for training, load to device if necessary
 
         Args:
             device (str): Device to load the networks to for training. 
-                          Defaults to 'gpu'.
+                          Defaults to 'cuda'.
         """
         for a in self.agents:
             a.policy.train()
             a.critic.train()
             a.target_policy.train()
             a.target_critic.train()
-        if device == 'gpu':
-            def fn(x): return x.cuda()
-        else:
-            def fn(x): return x.cpu()
+        #if device == 'gpu':
+        #    def fn(x): return x.cuda()
+        #else:
+        #    def fn(x): return x.cpu()
+        torch_device = torch.device(device)
         if not self.pol_dev == device:
             for a in self.agents:
-                a.policy = fn(a.policy)
+                a.policy.to(torch_device)
             self.pol_dev = device
         if not self.critic_dev == device:
             for a in self.agents:
-                a.critic = fn(a.critic)
+                a.critic.to(torch_device)
             self.critic_dev = device
         if not self.trgt_pol_dev == device:
             for a in self.agents:
-                a.target_policy = fn(a.target_policy)
+                a.target_policy.to(torch_device)
             self.trgt_pol_dev = device
         if not self.trgt_critic_dev == device:
             for a in self.agents:
-                a.target_critic = fn(a.target_critic)
+                a.target_critic.to(torch_device)
             self.trgt_critic_dev = device
 
     def prep_rollouts(self, device: str = 'cpu') -> None:
@@ -223,14 +224,19 @@ class MADDPG(object):
         """
         for a in self.agents:
             a.policy.eval()
-        if device == 'gpu':
-            def fn(x): return x.cuda()
+        #if device == 'gpu':
+        #    def fn(x): return x.cuda()
+        #else:
+        #    def fn(x): return x.cpu()
+        ## only need main policy for rollouts
+        if device == 'cuda':
+            torch_device = torch.device('cuda')
         else:
-            def fn(x): return x.cpu()
-        # only need main policy for rollouts
+            torch_device = torch.device('cpu')
         if not self.pol_dev == device:
             for a in self.agents:
-                a.policy = fn(a.policy)
+                #a.policy = fn(a.policy)
+                a.policy.to(torch_device)
             self.pol_dev = device
 
     def save(self, filename):

@@ -6,6 +6,7 @@ import numpy as np
 
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.float_properties_channel import FloatPropertiesChannel
+from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
 from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 from utils.PZWrapper import PZWrapper

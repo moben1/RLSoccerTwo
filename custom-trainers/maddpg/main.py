@@ -9,7 +9,7 @@ import torch
 from utils.misc import get_curr_run, load_config
 from train import train
 
-CONFIG_PATH = "config/maddpg/maddpg.yaml"
+CONFIG_PATH = "custom-trainers/config/maddpg/maddpg.yaml"
 USE_CUDA = torch.cuda.is_available()
 LOGGING_LEVEL = logging.DEBUG
 
@@ -36,10 +36,10 @@ if __name__ == '__main__':
                         ])
 
     # Checking if cuda is available
-    if not USE_CUDA and config['Torch']['rollout_dev'] == 'gpu':
+    if not USE_CUDA and config['Torch']['rollout_dev'] == 'cuda':
         logging.warning("CUDA not available. Switching to CPU for rollout device.")
         config['Torch']['rollout_dev'] = 'cpu'
-    if not USE_CUDA and config['Torch']['train_dev'] == 'gpu':
+    if not USE_CUDA and config['Torch']['train_dev'] == 'cuda':
         logging.warning("CUDA not available. Switching to CPU for training device.")
         config['Torch']['train_dev'] = 'cpu'
 

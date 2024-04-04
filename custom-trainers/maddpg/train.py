@@ -57,7 +57,7 @@ def train(config: dict, use_cuda: bool, logger: SummaryWriter) -> None:
 
     # Load or create model
     if config['Model']['load_from'] is not None:
-        maddpg = MADDPG.init_from_save(config['Model']['load_from'])
+        maddpg = MADDPG.init_from_save(config['Model']['load_from'], use_cuda=use_cuda)
     else:
         maddpg = MADDPG.init_from_env(env, **config['Model']['Hyperparameters'])
 
@@ -148,13 +148,6 @@ def train(config: dict, use_cuda: bool, logger: SummaryWriter) -> None:
         ep_rews = replay_buffer.get_average_rewards(ep_len * n_rollout_threads)
         for a_i, a_ep_rews in zip(maddpg.log_ids, ep_rews):
             logger.add_scalar('%s/mean_episode_rewards' % a_i, a_ep_rews, ep_i)
-        # ep_rews = replay_buffer.get_average_rewards(ep_len * n_rollout_threads)
-        # ep_stats = {'n_episodes': ep_i,
-        #            'n_rollout_threads': n_rollout_threads,
-        #            'ep_len': ep_len,
-        #            'mean_rews': {maddpg.agent_ids[i]: ep_rews[i] for i in range(maddpg.nagents)},
-        #            'noise_scale': scale}
-        # logging.info("EP stats : %s ", ep_stats)
 
         # Save model after every save_interval episodes
         if ep_i % save_interval < n_rollout_threads:

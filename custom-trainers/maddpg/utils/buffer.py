@@ -70,8 +70,7 @@ class ReplayBuffer(object):
             self.curr_i = 0
 
     def sample(self, N, to_gpu=False, norm_rews=True, min_std=1e-8):
-        inds = np.random.choice(np.arange(self.filled_i), size=N,
-                                replace=False)
+        inds = np.random.choice(np.arange(self.filled_i), size=N, replace=False)
         if to_gpu:
             def cast(x): return Variable(Tensor(x), requires_grad=False).cuda()
         else:

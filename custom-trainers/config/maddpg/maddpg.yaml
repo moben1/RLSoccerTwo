@@ -1,14 +1,14 @@
 Environment:
   executable: "executables/MADDPG_Windows"
-  no_graphics: True
-  n_rollout_threads: 8
-  use_subprocess: True
+  no_graphics: False
+  n_rollout_threads: 1
+  use_subprocess: False
   seed: 1
-  time_scale: 20.0
+  time_scale: 5.0
 
 ScaledProperties:
   ball_touch:
-    init: 2.0
+    init: 3.0
     final: 0.0
     n_episodes: 10000
 
@@ -18,8 +18,8 @@ Torch:
   n_training_threads: 8
 
 Model:
-  model_name: "MADDPG-cuda-v1"
-  load_from: null
+  model_name: "The-Dood-result"
+  load_from: "models/maddpg/model_ep4505.pt"
   n_episodes: 30000
   max_steps: 1000
   steps_per_update: 256
@@ -30,11 +30,11 @@ Model:
     batch_size: 1024
   Exploration:
     n_exploration_eps: 30000
-    init_noise_scale: 1.0
+    init_noise_scale: 10.0
     final_noise_scale: 0.0
   Hyperparameters:
     hidden_units: 128
     actor_lr: 0.0003
     critic_lr: 0.001
     tau: 0.001
-    gamma: 0.99
+    gamma: 0.90

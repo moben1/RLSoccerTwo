@@ -225,10 +225,6 @@ class MADDPG(object):
         """
         for a in self.agents:
             a.policy.eval()
-        # if device == 'gpu':
-        #    def fn(x): return x.cuda()
-        # else:
-        #    def fn(x): return x.cpu()
         # only need main policy for rollouts
         if device == 'cuda':
             torch_device = torch.device('cuda')
@@ -285,11 +281,14 @@ class MADDPG(object):
         return instance
 
     @classmethod
-    def init_from_save(cls, filename):
+    def init_from_save(cls, filename, use_cuda):
         """
         Instantiate instance of this class from file created by 'save' method
         """
-        save_dict = torch.load(filename)
+        if use_cuda:
+            save_dict = torch.load(filename, torch.device('cpu'))
+        else:
+            save_dict = torch.load(filename, map_location='cpu')
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):

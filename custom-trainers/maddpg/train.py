@@ -136,10 +136,10 @@ def train(config: dict, use_cuda: bool, logger: SummaryWriter) -> None:
 
             # Checking for environment done
             for i, done in enumerate(dones):
-                if all(done) :
-                    logging.debug("Episode %i finished after %i steps",
-                                  ep_i + i, ep_len)
+                if all(done) and not envs_dones[i]:
                     envs_dones[i] = True
+                    ep_log_id = ep_i + envs_dones.count(True)
+                    logger.add_scalar('episode_length', ep_len, ep_log_id)
             if ep_len > max_steps:
                 logging.warning("Episode %i reached max steps", ep_i)
                 break

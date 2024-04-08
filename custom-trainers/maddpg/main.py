@@ -12,7 +12,7 @@ from train import train
 
 CONFIG_PATH = "custom-trainers/config/maddpg/maddpg.yaml"
 
-LOGGING_LEVEL = logging.DEBUG
+LOGGING_LEVEL = logging.INFO
 
 
 if __name__ == '__main__':

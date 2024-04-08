@@ -12,12 +12,12 @@ def worker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, done, info = env.step_env(*data)
+            ob, reward, done, info = env.step(data)
             if all(done):
-                ob = env.reset_env(data[1])
+                ob = env.reset()
             remote.send((ob, reward, done, info))
         elif cmd == 'reset':
-            ob = env.reset_env(data)
+            ob = env.reset()
             remote.send(ob)
         elif cmd == 'reset_task':
             ob = env.reset_task()
@@ -26,9 +26,10 @@ def worker(remote, parent_remote, env_fn_wrapper):
             remote.close()
             break
         elif cmd == 'get_spaces':
-            remote.send(([env.observation_space(a) for a in data], [env.action_space(a) for a in data]))
+            remote.send(([env.observation_space(a) for a in env.agent_ids],
+                        [env.action_space(a) for a in env.agent_ids]))
         elif cmd == 'get_agent_ids':
-            remote.send(env.agents)
+            remote.send(env.agent_ids)
         elif cmd == 'scale_float_property':
             env.scale_float_property(*data)
         elif cmd == 'set_time_scale':
@@ -61,7 +62,7 @@ class SubprocVecEnv(VecEnv):
 
         self.remotes[0].send(('get_agent_ids', None))
         agent_ids = self.remotes[0].recv()
-        self.remotes[0].send(('get_spaces', agent_ids))
+        self.remotes[0].send(('get_spaces', None))
         observation_space, action_space = self.remotes[0].recv()
 
         VecEnv.__init__(self, len(env_fns), observation_space, action_space, agent_ids)
@@ -87,7 +88,7 @@ class SubprocVecEnv(VecEnv):
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', (action, self.agent_ids)))
+            remote.send(('step', action))
         self.waiting = True
 
     def step_wait(self):
@@ -98,7 +99,7 @@ class SubprocVecEnv(VecEnv):
 
     def reset(self):
         for remote in self.remotes:
-            remote.send(('reset', self.agent_ids))
+            remote.send(('reset', None))
         return np.stack([remote.recv() for remote in self.remotes])
 
     def reset_task(self):
@@ -126,13 +127,10 @@ class DummyVecEnv(VecEnv):
     def __init__(self, env_fns):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]
-        # Save only the first agent's observation and action space since it
-        # is the same for all agents
-        agent_ids = env.agents
         VecEnv.__init__(self, len(env_fns),
-                        [env.observation_space(a) for a in agent_ids],
-                        [env.action_space(a) for a in agent_ids],
-                        agent_ids)
+                        [env.observation_space(a) for a in env.agent_ids],
+                        [env.action_space(a) for a in env.agent_ids],
+                        env.agent_ids)
         self.ts = np.zeros(len(self.envs), dtype='int')
         self.actions = None
 
@@ -159,18 +157,18 @@ class DummyVecEnv(VecEnv):
         self.actions = actions
 
     def step_wait(self):
-        results = [env.step_env(a, self.agent_ids) for (a, env) in zip(self.actions, self.envs)]
+        results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
         obs, rews, dones, infos = map(np.array, zip(*results))
         self.ts += 1
         for (i, done) in enumerate(dones):
             if all(done):
-                obs[i] = self.envs[i].reset_env(self.agent_ids)
+                obs[i] = self.envs[i].reset()
                 self.ts[i] = 0
         self.actions = None
         return np.array(obs), np.array(rews), np.array(dones), infos
 
     def reset(self):
-        results = [env.reset_env(self.agent_ids) for env in self.envs]
+        results = [env.reset() for env in self.envs]
         return np.array(results)
 
     def close(self):

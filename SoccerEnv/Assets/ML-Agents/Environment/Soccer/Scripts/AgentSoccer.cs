@@ -189,7 +189,6 @@ public class AgentSoccer : Agent
 
     public override void OnActionReceived(ActionBuffers actionBuffers)
     {
-        /*
         float actionX = Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
         float actionZ = Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
         float actionRotate = Mathf.Clamp(actionBuffers.ContinuousActions[2], -1f, 1f);
@@ -210,14 +209,14 @@ public class AgentSoccer : Agent
 
         if (actionZ > 0)
         {
-            m_KickPower = actionZ;
+            m_KickPower = 1f;
         }
 
         transform.Rotate(transform.up * actionRotate, Time.deltaTime * 100f);
         agentRb.AddForce(transform.forward * m_ForwardSpeed * actionZ, ForceMode.VelocityChange);
         agentRb.AddForce(transform.right * m_LateralSpeed * actionX, ForceMode.VelocityChange);
-        */
-        MoveAgent(actionBuffers.DiscreteActions);
+
+        //MoveAgent(actionBuffers.DiscreteActions);
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
@@ -255,19 +254,19 @@ public class AgentSoccer : Agent
             if (Vector2.Dot(agent_ball, agent_goal) >= 0)
             {
                 //Debug.Log("Ball Touch Reward : " + .2f * m_BallTouch);
-                AddReward(.2f * m_BallTouch);
+                AddReward(0.2f * m_BallTouch);
             }
             else
             {
                 //Debug.Log("Ball Touch Reward : -" + 0.005f * m_BallTouch);
-                AddReward(-0.005f * m_BallTouch);
+                AddReward(-0.01f * m_BallTouch);
             }
         }
     }
 
     public override void OnEpisodeBegin()
     {
-        m_BallTouch = m_ResetParams.GetWithDefault("ball_touch", 1f);
+        m_BallTouch = m_ResetParams.GetWithDefault("ball_touch", 0f);
     }
 
 }

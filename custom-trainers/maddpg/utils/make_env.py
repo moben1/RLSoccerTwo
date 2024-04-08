@@ -5,12 +5,11 @@ from typing import Union
 import numpy as np
 
 from mlagents_envs.environment import UnityEnvironment
-from mlagents_envs.side_channel.float_properties_channel import FloatPropertiesChannel
+from mlagents_envs.side_channel.environment_parameters_channel import EnvironmentParametersChannel
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
 from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 from utils.PZWrapper import PZWrapper
-from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
 
 def make_env(executable: str, seed: int, worker: int = 0,
@@ -26,14 +25,14 @@ def make_env(executable: str, seed: int, worker: int = 0,
     Returns:
         PZWrapper: Specilised PettingZoo wrapper for the Unity environment
     """
-    config_channel = EngineConfigurationChannel()
-    float_channel = FloatPropertiesChannel()
+    engine_channel = EngineConfigurationChannel()
+    env_channel = EnvironmentParametersChannel()
     u_env = UnityEnvironment(file_name=executable, seed=seed,
                              worker_id=worker, no_graphics=no_graphics,
-                             side_channels=[config_channel, float_channel])
+                             side_channels=[engine_channel, env_channel])
     # channel.set_configuration_parameters(time_scale=20.0)
-    pz_env = PZWrapper(u_env, config_channel, float_channel)
-    pz_env.reset_env(pz_env.agents)
+    pz_env = PZWrapper(u_env, engine_channel, env_channel)
+    pz_env.reset()
 
     return pz_env
 

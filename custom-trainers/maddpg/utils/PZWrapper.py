@@ -1,6 +1,7 @@
 """ Specialisation of UnityParallelEnv to make it compatible with MADDPG.
 """
 from typing import Tuple
+from random import shuffle
 import numpy as np
 
 from mlagents_envs.envs.unity_parallel_env import UnityParallelEnv
@@ -18,34 +19,31 @@ class PZWrapper(UnityParallelEnv):
         Also fix some unexpected behavior from UnityParallelEnv.
     """
 
-    def __init__(self, env, config_channel, float_channel):
+    def __init__(self, env, engine_channel, env_channel):
         """ Initialize the wrapper with the given environment.
 
         Args:
             env (UnityEnvironment): The Unity environment to wrap
-            time_channel (EngineConfigurationChannel): The time channel of the environment
-            float_channel (FloatPropertiesChannel): The float channel of the environment
+            engine_channel (EngineConfigurationChannel): The time channel of the environment
+            env_channel (FloatPropertiesChannel): The float channel of the environment
         """
         UnityParallelEnv.__init__(self, env)
-        self.config_channel = config_channel
-        self.float_channel = float_channel
+        self.engine_channel = engine_channel
+        self.env_channel = env_channel
+        self.agent_ids = self.agents
 
-    def reset_env(self, agent_ids: list):
+    def reset(self):
         """ Reset the environment and return the initial observations.
             Convert the observations to a format compatible with MADDPG.
             Sending agent_ids to make sure we keep the order of agents.
 
-        Args:
-            agent_ids (List[str]): List of agent_ids from MADDPG instance
-
         Returns:
             np.array: Initial observations
         """
-        # giving agent_ids to make sure we keep the order of agents
         temp = UnityParallelEnv.reset(self)
-        return PZWrapper.convert_obs(temp, agent_ids)
+        return self.convert_obs(temp)
 
-    def step_env(self, actions: list, agent_ids: list):
+    def step(self, actions: list):
         """ Step the environment with the given actions and return the next
             observations, rewards, dones and infos.
             Convert the actions to a format compatible with the environment.
@@ -54,19 +52,24 @@ class PZWrapper(UnityParallelEnv):
 
         Args:
             actions (List[str]): Actions given by MADDPG instance
-            agent_ids (List[str]): List of agent_ids from MADDPG instance
 
         Returns:
             Tuple: next_obs, rewards, dones, infos
         """
         # giving agent_ids to make sure we keep the order of agents
         to_step = {agent: actions[i].flatten()
-                   for i, agent in enumerate(agent_ids)}
+                   for i, agent in enumerate(self.agent_ids)}
         tmp_next_obs, tmp_rewards, tmp_dones, infos = UnityParallelEnv.step(self, to_step)
-        next_obs = PZWrapper.convert_obs(tmp_next_obs, agent_ids)
-        rewards = PZWrapper.convert_obs(tmp_rewards, agent_ids)
-        dones = PZWrapper.convert_obs(tmp_dones, agent_ids)
+        next_obs = self.convert_obs(tmp_next_obs)
+        rewards = self.convert_obs(tmp_rewards)
+        dones = self.convert_obs(tmp_dones)
         return next_obs, rewards, dones, infos
+
+    def shuffle_teams(self):
+        """ Shuffle the order of agents in the environment. This mean that the
+            same brain will take observation/actions from/for another player. 
+        """
+        shuffle(self.agent_ids)
 
     def scale_float_property(self, property_name: str, scale: float):
         """ Scale the float property of the environment.
@@ -75,7 +78,7 @@ class PZWrapper(UnityParallelEnv):
             property_name (str): Name of the property to scale
             scale (float): Scale factor
         """
-        self.float_channel.set_property(property_name, scale)
+        self.env_channel.set_float_parameter(property_name, scale)
 
     def set_time_scale(self, scale: float):
         """ Set the time scale of the environment.
@@ -83,7 +86,7 @@ class PZWrapper(UnityParallelEnv):
         Args:
             scale (float): Time scale factor
         """
-        self.config_channel.set_configuration_parameters(time_scale=scale)
+        self.engine_channel.set_configuration_parameters(time_scale=scale)
 
     def _update_action_spaces(self) -> None:
         """ Redefining to initialize action space as float32
@@ -164,8 +167,7 @@ class PZWrapper(UnityParallelEnv):
             del self._cumm_rewards[current_agent]
             del self._infos[current_agent]
 
-    @staticmethod
-    def convert_obs(obs, agent_ids: list):
+    def convert_obs(self, obs):
         """ Convert the env observations to a format compatible with MADDPG.
         """
-        return np.array([obs[agent_id] for agent_id in agent_ids])
+        return np.array([obs[agent_id] for agent_id in self.agent_ids])

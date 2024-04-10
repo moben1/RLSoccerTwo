@@ -8,7 +8,7 @@ Pour fonctionner, **torch** à besoin que Cuda soit installé sur la machine. Si
 
 ## 2. Python 3.10.12
 
-Il est nécessaire, pour faire fonctionner **ml-agents**, d'avoir un environnement python 3.10.12. Il peut être installé comme ceci avec conda :
+Il est nécessaire, pour faire fonctionner **ml-agents**, d'avoir un environnement **Python 3.10.12**. Il peut être installé comme ceci avec conda :
 
 ```bash
 conda create -n ml-agents python=3.10.12
@@ -18,7 +18,7 @@ Assurez vous d'**activer l'environnement** pour la suite de l'installation.
 
 ## 3. Dépendances python
 
-Les dépendances python incluent : **PyTorch**, **ml-agents** et **ml-agents-envs**. Les 2 packages ml-agents release 21 sont incluent localement, à la racine du répertoire. Vous pouvez exécter les commandes suivantes pour les installer :
+Les dépendances python incluent : **PyTorch**, **ml-agents** et **ml-agents-envs**. Les 2 packages ml-agents release 21 sont inclues ici-même, à la racine du répertoire. Vous pouvez exécter les commandes suivantes pour les installer :
 
 ```bash
 pip3 install torch -f https://download.pytorch.org/whl/torch_stable.html

@@ -2,6 +2,8 @@
 
 Il s'agit d'un projet de session pour le cours IFT-608 (planification en intelligence artificielle), sous la supervision de Mohamed Mehdi Najjar. Nous avons implémenté les algorithmes de MARL MA-DDPG et Q-Mix.
 
+![Demo Maddpg](media/soccer_demo.gif)
+
 ## Installation
 
 L'installation la plus simple pour lancer un entraînement est détaillé dans `Install.md`.

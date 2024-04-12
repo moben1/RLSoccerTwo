@@ -10,6 +10,14 @@ L'installation la plus simple pour lancer un entraînement est détaillé dans `
 
 ## Utilisation
 
+### Démarrage rapide
+
+Depuis la racine du projet, exécutez la commande :
+
+```bash
+python trainers/maddpg/main.py
+```
+
 ### Configuration
 
 Dans le dossier `trainers/configs`, vous trouverez des **fichiers de configuration** par défault pour les entraînements. Ces fichiers ont étés commentés au mieux pour faciliter la personalisation. Pour faire office de démo, ces configurations charge **par défaut un modèle préentraîné**.

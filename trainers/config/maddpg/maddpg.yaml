@@ -1,0 +1,43 @@
+Environment:
+  executable: "executables/MADDPG_Windows" # path to the executable file (for linux) / folder (for windows)
+  no_graphics: False # False to display graphic environnment
+  n_rollout_threads: 1 # number of parallel environments instances
+  use_subprocess: False # Use multiprocessing to run environments in parallel
+  seed: 42 # initial random seed for the first instance
+  time_scale: 3.0 # time scale of the environment
+
+ScaledProperties: # Properties scaled over episodes for the environment
+  ball_touch: # Name of the property
+    init: 2.0 # Initial value of the property
+    final: 0.0 # Final value of the property
+    n_episodes: 7500 # Number of episodes to scale over
+
+Torch:
+  rollout_dev: "cpu" # Device for rollout (inference, iterations without uptade)
+  train_dev: "cpu" # Device for training (update phases)
+  n_training_threads: 8 # Number of threads for torch (in case cuda is not available)
+
+Self-play:
+  team_shuffle_freq: 500 # Frequency of shuffling teams, in number of episodes (0 to disable)
+
+Model:
+  model_name: "Run-Dir-Name" # Name of the model directory
+  load_from: "models/maddpg/Demo/run1/model.pt" # Load pre-trained model from path (null to disable)
+  n_episodes: 20000 # Number of episodes to train the model for
+  max_steps: 1000 # Maximum number of steps per episode
+  steps_per_update: 512 # Number of steps between update phases
+  save_interval: 1000 # Number of episodes between model saves
+  discrete_action: False # True for discrete action space, False for continuous
+  Buffer:
+    buffer_length: 1000000 # Maximum number of iterations to store in the replay buffer
+    batch_size: 1024 # Number of iterations to sample at each update
+  Exploration:
+    n_exploration_eps: 20000 # Number of episodes to explore for
+    init_noise_scale: 2.5 # Initial noise scale
+    final_noise_scale: 0.0 # Final noise scale
+  Hyperparameters:
+    hidden_units: 128 # Number of units in hidden layers
+    actor_lr: 0.0003 # Learning rate for actor
+    critic_lr: 0.0008 # Learning rate for critic
+    tau: 0.001 # Soft update rate
+    gamma: 0.90 # Discount factor
